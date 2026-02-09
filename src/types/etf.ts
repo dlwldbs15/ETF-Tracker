@@ -8,6 +8,9 @@ export interface Etf {
   expenseRatio: number;
   category: string;
   volume: number;
+  dividendYield: number;
+  dividendCycle: string;
+  lastDividendAmount: number;
 }
 
 export interface EtfDetail extends Etf {

@@ -15,13 +15,19 @@ import {
   Menu,
   ChevronDown,
   ChevronUp,
+  Coins,
+  CircleDollarSign,
+  CalendarClock,
+  ShieldCheck,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PriceLineChart } from "@/components/chart/price-line-chart";
 import { useShell } from "@/components/layout/shell";
+import { usePortfolio } from "@/context/portfolio-context";
 import { getEtfDetail, generatePriceHistory, getHoldings } from "@/lib/mock-data";
-import { Holding } from "@/types/etf";
+import { Holding, EtfDetail } from "@/types/etf";
 import {
   formatKRW,
   formatMarketCap,
@@ -29,6 +35,7 @@ import {
   formatExpenseRatio,
   formatVolume,
 } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export default function EtfDetailPage() {
   const params = useParams<{ ticker: string }>();
@@ -173,10 +180,310 @@ export default function EtfDetailPage() {
             <HoldingsList holdings={holdings} />
           </div>
         </div>
+
+        {/* Dividend Section */}
+        <DividendSection etf={etf} />
+
+        {/* Dividend Reinvestment Simulation */}
+        <DividendReinvestSimulation etf={etf} />
       </div>
     </div>
   );
 }
+
+// ─── 예상 배당 정보 섹션 ─────────────────────────────────
+
+function DividendSection({ etf }: { etf: EtfDetail }) {
+  const { items } = usePortfolio();
+  const portfolioItem = items.find((i) => i.ticker === etf.ticker);
+  const quantity = portfolioItem?.quantity ?? 0;
+
+  const totalInvestment = etf.price * quantity;
+  const annualDividend = totalInvestment * (etf.dividendYield / 100);
+  const annualExpense = totalInvestment * (etf.expenseRatio / 100);
+  const isMonthly = etf.dividendCycle === "월배당";
+  const monthlyDividend = annualDividend / 12;
+  const coverageRatio = annualExpense > 0 ? annualDividend / annualExpense : 0;
+  const hasDividend = etf.dividendYield > 0;
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
+      <div className="mb-4 flex items-center gap-2">
+        <Coins className="h-5 w-5 text-amber-400" />
+        <h2 className="text-sm font-semibold text-foreground">
+          예상 배당 정보
+        </h2>
+        {hasDividend && (
+          <Badge variant="secondary" className="text-[10px] font-normal">
+            {etf.dividendCycle}
+          </Badge>
+        )}
+      </div>
+
+      {!hasDividend ? (
+        <div className="flex flex-col items-center justify-center gap-2 py-6">
+          <Coins className="h-8 w-8 text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground">
+            이 ETF는 배당금을 지급하지 않습니다
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Dividend info cards */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-md bg-secondary/50 p-2.5 sm:p-3">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Percent className="h-3.5 w-3.5" />
+                <span className="text-xs">배당수익률</span>
+              </div>
+              <p className="mt-1 text-sm font-bold text-amber-400 sm:text-base">
+                {etf.dividendYield.toFixed(2)}%
+              </p>
+            </div>
+            <div className="rounded-md bg-secondary/50 p-2.5 sm:p-3">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <CalendarClock className="h-3.5 w-3.5" />
+                <span className="text-xs">배당 주기</span>
+              </div>
+              <p className="mt-1 text-sm font-bold text-foreground sm:text-base">
+                {etf.dividendCycle}
+              </p>
+            </div>
+            <div className="rounded-md bg-secondary/50 p-2.5 sm:p-3">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <CircleDollarSign className="h-3.5 w-3.5" />
+                <span className="text-xs">최근 1주 배당</span>
+              </div>
+              <p className="mt-1 text-sm font-bold text-foreground sm:text-base">
+                {formatKRW(etf.lastDividendAmount)}
+              </p>
+            </div>
+            <div className="rounded-md bg-secondary/50 p-2.5 sm:p-3">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                <span className="text-xs">배당 vs 수수료</span>
+              </div>
+              <p className={cn(
+                "mt-1 text-sm font-bold sm:text-base",
+                coverageRatio >= 1 ? "text-emerald-400" : "text-amber-400"
+              )}>
+                {coverageRatio > 0 ? `${coverageRatio.toFixed(1)}배` : "-"}
+              </p>
+            </div>
+          </div>
+
+          {/* My dividend estimate (quantity-based) */}
+          {quantity > 0 ? (
+            <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-xs font-medium text-amber-400">
+                  내 예상 배당금 ({quantity}주 보유 기준)
+                </span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  투자금 {formatKRW(totalInvestment)}
+                </span>
+              </div>
+
+              <div className={cn(
+                "grid gap-3",
+                isMonthly ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2"
+              )}>
+                <div>
+                  <p className="text-xs text-muted-foreground">연간 예상 배당금</p>
+                  <p className="mt-0.5 text-lg font-bold text-foreground sm:text-xl">
+                    {formatKRW(Math.round(annualDividend))}
+                  </p>
+                </div>
+                {isMonthly && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">월 평균 배당금</p>
+                    <p className="mt-0.5 text-lg font-bold text-amber-400 sm:text-xl">
+                      {formatKRW(Math.round(monthlyDividend))}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-muted-foreground">연간 수수료 (총보수)</p>
+                  <p className="mt-0.5 text-lg font-bold text-red-400/80 sm:text-xl">
+                    -{formatKRW(Math.round(annualExpense))}
+                  </p>
+                </div>
+              </div>
+
+              {/* Net summary */}
+              <div className="mt-3 flex items-center justify-between border-t border-amber-400/10 pt-3">
+                <span className="text-xs text-muted-foreground">
+                  배당 - 수수료 (순 수익)
+                </span>
+                <span className={cn(
+                  "font-mono text-sm font-bold",
+                  annualDividend - annualExpense >= 0 ? "text-emerald-400" : "text-red-400"
+                )}>
+                  {annualDividend - annualExpense >= 0 ? "+" : ""}
+                  {formatKRW(Math.round(annualDividend - annualExpense))}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border p-4 text-center">
+              <p className="text-xs text-muted-foreground">
+                포트폴리오에 이 ETF를 담고 수량을 입력하면
+              </p>
+              <p className="text-xs text-muted-foreground">
+                예상 배당금을 확인할 수 있습니다
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── 배당 재투자 시뮬레이션 ──────────────────────────────
+
+const MILESTONES = [1, 3, 5, 10, 20] as const;
+
+function DividendReinvestSimulation({ etf }: { etf: EtfDetail }) {
+  const { items } = usePortfolio();
+  const portfolioItem = items.find((i) => i.ticker === etf.ticker);
+  const quantity = portfolioItem?.quantity ?? 0;
+
+  const hasDividend = etf.dividendYield > 0;
+  if (!hasDividend) return null;
+
+  const totalInvestment = etf.price * quantity;
+  const rate = etf.dividendYield / 100;
+
+  // 배당 주기에 따른 복리 횟수
+  const compoundsPerYear =
+    etf.dividendCycle === "월배당" ? 12 : etf.dividendCycle === "분기배당" ? 4 : 1;
+  const periodicRate = rate / compoundsPerYear;
+
+  // 시뮬레이션 결과 계산
+  const simulations = MILESTONES.map((year) => {
+    const periods = compoundsPerYear * year;
+    // 재투자 (복리)
+    const withReinvest = totalInvestment * Math.pow(1 + periodicRate, periods);
+    // 단순 수령 (단리)
+    const withoutReinvest = totalInvestment * (1 + rate * year);
+    const extra = withReinvest - withoutReinvest;
+    const extraPct =
+      totalInvestment > 0
+        ? ((withReinvest - totalInvestment) / totalInvestment) * 100
+        : 0;
+    const extraVsSimplePct =
+      withoutReinvest > totalInvestment
+        ? ((withReinvest - withoutReinvest) / (withoutReinvest - totalInvestment)) * 100
+        : 0;
+
+    return { year, withReinvest, withoutReinvest, extra, extraPct, extraVsSimplePct };
+  });
+
+  const tenYear = simulations.find((s) => s.year === 10)!;
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
+      <div className="mb-4 flex items-center gap-2">
+        <RefreshCw className="h-5 w-5 text-emerald-400" />
+        <h2 className="text-sm font-semibold text-foreground">
+          배당 재투자 효과
+        </h2>
+        <Badge variant="secondary" className="text-[10px] font-normal">
+          복리 시뮬레이션
+        </Badge>
+      </div>
+
+      {/* Highlight message */}
+      <div className="mb-4 rounded-lg bg-emerald-400/5 border border-emerald-400/20 p-3 sm:p-4">
+        <p className="text-sm leading-relaxed text-foreground">
+          {quantity > 0 ? (
+            <>
+              만약 받은 배당금을{" "}
+              <span className="font-semibold text-emerald-400">
+                {etf.dividendCycle === "월배당" ? "매달" : etf.dividendCycle === "분기배당" ? "매 분기" : "매년"} 재투자
+              </span>
+              한다면,{" "}
+              <span className="font-semibold text-amber-400">10년 후</span> 단순
+              배당 수령 대비 자산이 약{" "}
+              <span className="font-bold text-emerald-400">
+                {formatKRW(Math.round(tenYear.extra))}
+              </span>{" "}
+              더 늘어납니다.
+            </>
+          ) : (
+            <>
+              배당수익률{" "}
+              <span className="font-semibold text-amber-400">
+                {etf.dividendYield.toFixed(2)}%
+              </span>
+              로{" "}
+              <span className="font-semibold text-emerald-400">
+                {etf.dividendCycle === "월배당" ? "매달" : etf.dividendCycle === "분기배당" ? "매 분기" : "매년"} 재투자
+              </span>
+              하면,{" "}
+              <span className="font-semibold text-amber-400">10년 후</span>{" "}
+              총 수익이 약{" "}
+              <span className="font-bold text-emerald-400">
+                {tenYear.extraPct.toFixed(1)}%
+              </span>{" "}
+              증가합니다. 포트폴리오에 담으면 금액으로 확인할 수 있습니다.
+            </>
+          )}
+        </p>
+      </div>
+
+      {/* Simulation table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs sm:text-sm">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="pb-2 text-left font-medium text-muted-foreground">기간</th>
+              <th className="pb-2 text-right font-medium text-muted-foreground">단순 수령</th>
+              <th className="pb-2 text-right font-medium text-emerald-400/70">재투자 (복리)</th>
+              <th className="pb-2 text-right font-medium text-muted-foreground">복리 효과</th>
+            </tr>
+          </thead>
+          <tbody>
+            {simulations.map((sim) => (
+              <tr key={sim.year} className="border-b border-border/50 last:border-b-0">
+                <td className="py-2.5 font-medium text-foreground">{sim.year}년 후</td>
+                <td className="py-2.5 text-right font-mono text-muted-foreground">
+                  {quantity > 0 ? (
+                    formatKRW(Math.round(sim.withoutReinvest))
+                  ) : (
+                    `+${(etf.dividendYield * sim.year).toFixed(1)}%`
+                  )}
+                </td>
+                <td className="py-2.5 text-right font-mono font-semibold text-emerald-400">
+                  {quantity > 0 ? (
+                    formatKRW(Math.round(sim.withReinvest))
+                  ) : (
+                    `+${sim.extraPct.toFixed(1)}%`
+                  )}
+                </td>
+                <td className="py-2.5 text-right font-mono text-amber-400">
+                  {quantity > 0 ? (
+                    `+${formatKRW(Math.round(sim.extra))}`
+                  ) : (
+                    `+${(sim.extraPct - etf.dividendYield * sim.year).toFixed(1)}%p`
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+        * 배당수익률 {etf.dividendYield.toFixed(2)}% 고정, 주가 변동 미반영,
+        세전 기준의 단순 시뮬레이션입니다. 실제 수익은 시장 상황에 따라 달라질 수 있습니다.
+      </p>
+    </div>
+  );
+}
+
+// ─── Holdings List ───────────────────────────────────────
 
 const COLLAPSED_COUNT = 5;
 

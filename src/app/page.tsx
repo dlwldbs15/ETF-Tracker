@@ -1,101 +1,117 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useMemo } from "react";
+import { Search } from "lucide-react";
+import { Header } from "@/components/layout/header";
+import { EtfRankingTable } from "@/components/etf-ranking-table";
+import { FilterChips } from "@/components/filter-chips";
+import { useShell } from "@/components/layout/shell";
+import { mockEtfs, providers } from "@/lib/mock-data";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const { openSidebar } = useShell();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const filteredEtfs = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return mockEtfs.filter((etf) => {
+      const matchesSearch =
+        query === "" ||
+        etf.ticker.toLowerCase().includes(query) ||
+        etf.name.toLowerCase().includes(query);
+
+      const matchesProvider =
+        selectedProvider === null || etf.provider === selectedProvider;
+
+      return matchesSearch && matchesProvider;
+    });
+  }, [searchQuery, selectedProvider]);
+
+  return (
+    <>
+      <Header
+        title="대시보드"
+        description="ETF 시장 현황을 한눈에 확인하세요"
+        onMenuClick={openSidebar}
+      />
+      <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3">
+          <SummaryCard label="KOSPI" value="2,687.45" change="+1.23%" positive />
+          <SummaryCard label="KOSDAQ" value="872.31" change="-0.45%" positive={false} />
+          <SummaryCard label="S&P 500" value="5,234.18" change="+0.67%" positive />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {/* ETF Ranking Table */}
+        <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-base font-semibold text-foreground">
+              ETF 수익률 순위
+            </h2>
+
+            {/* Search Input */}
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="티커 또는 종목명 검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+          </div>
+
+          {/* Filter Chips - scrollable on mobile */}
+          <div className="-mx-4 mb-4 overflow-x-auto px-4 sm:-mx-0 sm:px-0">
+            <FilterChips
+              options={providers}
+              selected={selectedProvider}
+              onSelect={setSelectedProvider}
+            />
+          </div>
+
+          {/* Result Count */}
+          <p className="mb-3 text-xs text-muted-foreground">
+            총 {filteredEtfs.length}개 종목
+          </p>
+
+          {/* Table with horizontal scroll on mobile */}
+          <div className="-mx-4 overflow-x-auto sm:-mx-5">
+            <div className="min-w-[700px] px-4 sm:px-5">
+              <EtfRankingTable data={filteredEtfs} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  change,
+  positive,
+}: {
+  label: string;
+  value: string;
+  change: string;
+  positive: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-3 sm:p-4">
+      <p className="text-xs text-muted-foreground sm:text-sm">{label}</p>
+      <p className="mt-1 text-xl font-bold text-foreground sm:text-2xl">{value}</p>
+      <p
+        className={`mt-1 text-xs font-medium sm:text-sm ${
+          positive ? "text-emerald-400" : "text-red-400"
+        }`}
+      >
+        {change}
+      </p>
     </div>
   );
 }

@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Category ────────────────────────────────────────────
+// ETF 카테고리 (국내주식, 해외주식, 채권, 원자재 등)
+// 1 Category : N Etf
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique // "국내주식", "해외주식", "채권" 등
+  description String? // 카테고리 설명
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  etfs Etf[]
+
+  @@map("categories")
+}
+
+// ─── Etf ─────────────────────────────────────────────────
+// ETF 종목 기본 정보
+// 1 Etf : N PriceHistory
+model Etf {
+  id           Int       @id @default(autoincrement())
+  ticker       String    @unique // 종목코드 (예: "069500")
+  name         String // 한글명 (예: "KODEX 200")
+  provider     String // 운용사 (예: "삼성자산운용")
+  expenseRatio Decimal   @db.Decimal(5, 4) // 총보수 (예: 0.0015 = 0.15%)
+  marketCap    BigInt? // 시가총액 (원 단위)
+  benchmark    String? // 기초지수 (예: "KOSPI 200")
+  listingDate  DateTime? // 상장일
+  isActive     Boolean   @default(true) // 상장 여부
+
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  priceHistories PriceHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([provider])
+  @@map("etfs")
+}
+
+// ─── PriceHistory ────────────────────────────────────────
+// 일자별 가격 데이터
+model PriceHistory {
+  id           Int      @id @default(autoincrement())
+  date         DateTime @db.Date // 거래일
+  closePrice   Decimal  @db.Decimal(12, 2) // 종가
+  openPrice    Decimal? @db.Decimal(12, 2) // 시가
+  highPrice    Decimal? @db.Decimal(12, 2) // 고가
+  lowPrice     Decimal? @db.Decimal(12, 2) // 저가
+  volume       BigInt // 거래량
+  changeRate   Decimal  @db.Decimal(8, 4) // 등락률 (%, 예: 2.3400)
+  changeAmount Decimal? @db.Decimal(12, 2) // 등락액
+
+  etfId Int
+  etf   Etf @relation(fields: [etfId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([etfId, date]) // 같은 ETF의 같은 날짜 중복 방지
+  @@index([date])
+  @@index([etfId, date(sort: Desc)]) // 최신 가격 조회 최적화
+  @@map("price_histories")
+}

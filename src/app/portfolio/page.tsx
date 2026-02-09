@@ -6,11 +6,9 @@ import {
   PieChart,
   TrendingUp,
   TrendingDown,
-  AlertCircle,
-  CheckCircle2,
   Wallet,
-  Percent,
   Briefcase,
+  Hash,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,13 +28,12 @@ export default function PortfolioPage() {
   const {
     items,
     removeItem,
-    updateWeight,
-    totalWeight,
+    updateQuantity,
+    getAmount,
+    getWeight,
+    totalAmount,
     estimatedReturn,
   } = usePortfolio();
-
-  const isBalanced = Math.abs(totalWeight - 100) < 0.01;
-  const isOver = totalWeight > 100;
 
   return (
     <>
@@ -53,7 +50,13 @@ export default function PortfolioPage() {
               icon={<Briefcase className="h-4 w-4" />}
               label="보유 종목"
               value={`${items.length}개`}
-              sub={`비중 합계 ${totalWeight.toFixed(1)}%`}
+              sub={`총 투자금액 ${formatKRW(totalAmount)}`}
+            />
+            <SummaryCard
+              icon={<Wallet className="h-4 w-4" />}
+              label="총 평가금액"
+              value={formatKRW(totalAmount)}
+              sub="현재가 기준"
             />
             <SummaryCard
               icon={<TrendingUp className="h-4 w-4" />}
@@ -67,76 +70,64 @@ export default function PortfolioPage() {
               label="1개월 예상 수익률"
               value={formatChangeRate(estimatedReturn.rate1m)}
               valueColor={estimatedReturn.rate1m >= 0}
-              sub="비중 가중 평균"
-            />
-            <SummaryCard
-              icon={<Wallet className="h-4 w-4" />}
-              label="가중 총보수"
-              value={formatExpenseRatio(estimatedReturn.weightedExpense)}
-              sub="연간 비용"
+              sub={`가중 총보수 ${formatExpenseRatio(estimatedReturn.weightedExpense)}`}
             />
           </div>
         )}
 
-        {/* Weight Status Bar */}
-        {items.length > 0 && (
+        {/* Weight Distribution Bar */}
+        {items.length > 0 && totalAmount > 0 && (
           <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Percent className="h-4 w-4 text-muted-foreground" />
+                <PieChart className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium text-foreground">
                   비중 배분
                 </span>
               </div>
-              <div className="flex items-center gap-1.5">
-                {isBalanced ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                ) : (
-                  <AlertCircle
-                    className={cn(
-                      "h-4 w-4",
-                      isOver ? "text-red-400" : "text-amber-400"
-                    )}
+              <span className="text-xs text-muted-foreground">
+                수량 기반 자동 계산
+              </span>
+            </div>
+
+            {/* Stacked bar */}
+            <div className="flex h-3 overflow-hidden rounded-full bg-secondary">
+              {items.map((item) => {
+                const weight = getWeight(item.ticker);
+                if (weight <= 0) return null;
+                return (
+                  <div
+                    key={item.ticker}
+                    className="h-full transition-all duration-300"
+                    style={{
+                      width: `${weight}%`,
+                      backgroundColor: getBarColor(item.ticker),
+                    }}
+                    title={`${mockEtfs.find((e) => e.ticker === item.ticker)?.name} ${weight.toFixed(1)}%`}
                   />
-                )}
-                <span
-                  className={cn(
-                    "text-sm font-semibold",
-                    isBalanced
-                      ? "text-emerald-400"
-                      : isOver
-                        ? "text-red-400"
-                        : "text-amber-400"
-                  )}
-                >
-                  {totalWeight.toFixed(1)}%
-                </span>
-                <span className="text-xs text-muted-foreground">/ 100%</span>
-              </div>
+                );
+              })}
             </div>
 
-            {/* Progress bar */}
-            <div className="h-2.5 overflow-hidden rounded-full bg-secondary">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-all duration-300",
-                  isBalanced
-                    ? "bg-emerald-400"
-                    : isOver
-                      ? "bg-red-400"
-                      : "bg-amber-400"
-                )}
-                style={{ width: `${Math.min(totalWeight, 100)}%` }}
-              />
+            {/* Legend */}
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+              {items.map((item) => {
+                const weight = getWeight(item.ticker);
+                if (weight <= 0) return null;
+                const etf = mockEtfs.find((e) => e.ticker === item.ticker);
+                return (
+                  <div key={item.ticker} className="flex items-center gap-1.5">
+                    <div
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: getBarColor(item.ticker) }}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      {etf?.name?.slice(0, 10)} {weight.toFixed(1)}%
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-
-            {!isBalanced && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                {isOver
-                  ? `비중 합계가 100%를 ${(totalWeight - 100).toFixed(1)}% 초과합니다.`
-                  : `${(100 - totalWeight).toFixed(1)}%를 더 배분할 수 있습니다.`}
-              </p>
-            )}
           </div>
         )}
 
@@ -173,6 +164,8 @@ export default function PortfolioPage() {
                 const etf = mockEtfs.find((e) => e.ticker === item.ticker);
                 if (!etf) return null;
                 const isPositive = etf.changeRate >= 0;
+                const amount = getAmount(item.ticker);
+                const weight = getWeight(item.ticker);
 
                 return (
                   <li
@@ -205,7 +198,7 @@ export default function PortfolioPage() {
                       </div>
                     </div>
 
-                    {/* Right: price, weight, actions */}
+                    {/* Right: price, quantity, amount, weight, actions */}
                     <div className="flex items-center gap-3 sm:gap-4">
                       {/* Current price & change */}
                       <div className="hidden text-right sm:block">
@@ -227,22 +220,32 @@ export default function PortfolioPage() {
                         </p>
                       </div>
 
-                      {/* Weight input */}
+                      {/* Quantity input */}
                       <div className="flex items-center gap-1.5">
+                        <Hash className="h-3.5 w-3.5 text-muted-foreground" />
                         <input
                           type="number"
                           min={0}
-                          max={100}
-                          step={0.1}
-                          value={item.weight || ""}
+                          step={1}
+                          value={item.quantity || ""}
                           placeholder="0"
                           onChange={(e) => {
-                            const v = parseFloat(e.target.value);
-                            updateWeight(item.ticker, isNaN(v) ? 0 : v);
+                            const v = parseInt(e.target.value, 10);
+                            updateQuantity(item.ticker, isNaN(v) ? 0 : Math.max(0, v));
                           }}
-                          className="h-8 w-20 rounded-md border border-input bg-background px-2 text-right font-mono text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                          className="h-8 w-16 rounded-md border border-input bg-background px-2 text-right font-mono text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                         />
-                        <span className="text-xs text-muted-foreground">%</span>
+                        <span className="text-xs text-muted-foreground">주</span>
+                      </div>
+
+                      {/* Calculated amount & weight */}
+                      <div className="text-right">
+                        <p className="font-mono text-sm text-foreground">
+                          {formatKRW(amount)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {weight > 0 ? `${weight.toFixed(1)}%` : "-"}
+                        </p>
                       </div>
 
                       {/* Remove button */}
@@ -264,6 +267,21 @@ export default function PortfolioPage() {
       </div>
     </>
   );
+}
+
+const BAR_COLORS = [
+  "#34d399", "#60a5fa", "#f472b6", "#fbbf24",
+  "#a78bfa", "#fb923c", "#2dd4bf", "#e879f9",
+  "#4ade80", "#f87171", "#38bdf8", "#facc15",
+  "#c084fc", "#fb7185", "#22d3ee",
+];
+
+function getBarColor(ticker: string): string {
+  let hash = 0;
+  for (let i = 0; i < ticker.length; i++) {
+    hash = ticker.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return BAR_COLORS[Math.abs(hash) % BAR_COLORS.length];
 }
 
 function SummaryCard({

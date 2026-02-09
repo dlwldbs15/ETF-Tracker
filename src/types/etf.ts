@@ -28,5 +28,5 @@ export interface Holding {
 
 export interface PortfolioItem {
   ticker: string;
-  weight: number;
+  quantity: number;
 }

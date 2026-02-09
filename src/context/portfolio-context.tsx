@@ -14,9 +14,14 @@ interface PortfolioContextValue {
   items: PortfolioItem[];
   addItem: (ticker: string) => void;
   removeItem: (ticker: string) => void;
-  updateWeight: (ticker: string, weight: number) => void;
+  updateQuantity: (ticker: string, quantity: number) => void;
   hasTicker: (ticker: string) => boolean;
-  totalWeight: number;
+  /** 각 종목별 평가금액 (ticker → amount) */
+  getAmount: (ticker: string) => number;
+  /** 각 종목별 비중 % (ticker → weight) */
+  getWeight: (ticker: string) => number;
+  /** 총 투자금액 */
+  totalAmount: number;
   estimatedReturn: { rate1w: number; rate1m: number; weightedExpense: number };
 }
 
@@ -34,7 +39,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const addItem = useCallback((ticker: string) => {
     setItems((prev) => {
       if (prev.some((i) => i.ticker === ticker)) return prev;
-      return [...prev, { ticker, weight: 0 }];
+      return [...prev, { ticker, quantity: 0 }];
     });
   }, []);
 
@@ -42,9 +47,9 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     setItems((prev) => prev.filter((i) => i.ticker !== ticker));
   }, []);
 
-  const updateWeight = useCallback((ticker: string, weight: number) => {
+  const updateQuantity = useCallback((ticker: string, quantity: number) => {
     setItems((prev) =>
-      prev.map((i) => (i.ticker === ticker ? { ...i, weight } : i))
+      prev.map((i) => (i.ticker === ticker ? { ...i, quantity } : i))
     );
   }, []);
 
@@ -53,13 +58,37 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     [items]
   );
 
-  const totalWeight = useMemo(
-    () => items.reduce((sum, i) => sum + i.weight, 0),
-    [items]
+  // 종목별 평가금액 맵
+  const amountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of items) {
+      const etf = mockEtfs.find((e) => e.ticker === item.ticker);
+      if (!etf) continue;
+      map.set(item.ticker, etf.price * item.quantity);
+    }
+    return map;
+  }, [items]);
+
+  const totalAmount = useMemo(
+    () => Array.from(amountMap.values()).reduce((sum, v) => sum + v, 0),
+    [amountMap]
+  );
+
+  const getAmount = useCallback(
+    (ticker: string) => amountMap.get(ticker) ?? 0,
+    [amountMap]
+  );
+
+  const getWeight = useCallback(
+    (ticker: string) => {
+      if (totalAmount === 0) return 0;
+      return ((amountMap.get(ticker) ?? 0) / totalAmount) * 100;
+    },
+    [amountMap, totalAmount]
   );
 
   const estimatedReturn = useMemo(() => {
-    if (items.length === 0 || totalWeight === 0) {
+    if (items.length === 0 || totalAmount === 0) {
       return { rate1w: 0, rate1m: 0, weightedExpense: 0 };
     }
 
@@ -68,7 +97,8 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     let weightedExpense = 0;
 
     for (const item of items) {
-      if (item.weight <= 0) continue;
+      const amount = amountMap.get(item.ticker) ?? 0;
+      if (amount <= 0) continue;
 
       const etf = mockEtfs.find((e) => e.ticker === item.ticker);
       if (!etf) continue;
@@ -76,7 +106,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       const history = generatePriceHistory(item.ticker);
       if (history.length < 2) continue;
 
-      const pct = item.weight / totalWeight;
+      const pct = amount / totalAmount;
       const lastPrice = history[history.length - 1].price;
       const weekAgoPrice = history[Math.max(history.length - 7, 0)].price;
       const firstPrice = history[0].price;
@@ -87,19 +117,21 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     }
 
     return { rate1w, rate1m, weightedExpense };
-  }, [items, totalWeight]);
+  }, [items, amountMap, totalAmount]);
 
   const value = useMemo(
     () => ({
       items,
       addItem,
       removeItem,
-      updateWeight,
+      updateQuantity,
       hasTicker,
-      totalWeight,
+      getAmount,
+      getWeight,
+      totalAmount,
       estimatedReturn,
     }),
-    [items, addItem, removeItem, updateWeight, hasTicker, totalWeight, estimatedReturn]
+    [items, addItem, removeItem, updateQuantity, hasTicker, getAmount, getWeight, totalAmount, estimatedReturn]
   );
 
   return (

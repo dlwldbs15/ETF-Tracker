@@ -8,10 +8,13 @@ import { FilterChips } from "@/components/filter-chips";
 import { useShell } from "@/components/layout/shell";
 import { mockEtfs, providers } from "@/lib/mock-data";
 
+const dividendCycles = ["월배당", "분기배당", "연배당"];
+
 export default function Home() {
   const { openSidebar } = useShell();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [selectedDividend, setSelectedDividend] = useState<string | null>(null);
 
   const filteredEtfs = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -25,9 +28,12 @@ export default function Home() {
       const matchesProvider =
         selectedProvider === null || etf.provider === selectedProvider;
 
-      return matchesSearch && matchesProvider;
+      const matchesDividend =
+        selectedDividend === null || etf.dividendCycle === selectedDividend;
+
+      return matchesSearch && matchesProvider && matchesDividend;
     });
-  }, [searchQuery, selectedProvider]);
+  }, [searchQuery, selectedProvider, selectedDividend]);
 
   return (
     <>
@@ -64,13 +70,25 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Filter Chips - scrollable on mobile */}
-          <div className="-mx-4 mb-4 overflow-x-auto px-4 sm:-mx-0 sm:px-0">
-            <FilterChips
-              options={providers}
-              selected={selectedProvider}
-              onSelect={setSelectedProvider}
-            />
+          {/* Filters */}
+          <div className="mb-4 flex flex-col gap-2.5">
+            <div className="-mx-4 flex items-center gap-2.5 overflow-x-auto px-4 sm:-mx-0 sm:px-0">
+              <span className="w-10 shrink-0 text-[11px] font-medium text-muted-foreground">운용사</span>
+              <FilterChips
+                options={providers}
+                selected={selectedProvider}
+                onSelect={setSelectedProvider}
+              />
+            </div>
+            <div className="-mx-4 flex items-center gap-2.5 overflow-x-auto px-4 sm:-mx-0 sm:px-0">
+              <span className="w-10 shrink-0 text-[11px] font-medium text-muted-foreground">배당</span>
+              <FilterChips
+                options={dividendCycles}
+                selected={selectedDividend}
+                onSelect={setSelectedDividend}
+                variant="outline"
+              />
+            </div>
           </div>
 
           {/* Result Count */}
@@ -80,7 +98,7 @@ export default function Home() {
 
           {/* Table with horizontal scroll on mobile */}
           <div className="-mx-4 overflow-x-auto sm:-mx-5">
-            <div className="min-w-[700px] px-4 sm:px-5">
+            <div className="min-w-[850px] px-4 sm:px-5">
               <EtfRankingTable data={filteredEtfs} />
             </div>
           </div>

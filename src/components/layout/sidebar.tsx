@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Search, Briefcase, TrendingUp, X } from "lucide-react";
+import { Home, Search, Briefcase, CalendarDays, TrendingUp, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "홈", icon: Home },
   { href: "/explore", label: "ETF 탐색", icon: Search },
   { href: "/portfolio", label: "내 포트폴리오", icon: Briefcase },
+  { href: "/dividend-calendar", label: "배당 캘린더", icon: CalendarDays },
 ];
 
 interface SidebarProps {

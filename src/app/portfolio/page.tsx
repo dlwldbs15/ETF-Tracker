@@ -3,15 +3,21 @@
 import Link from "next/link";
 import {
   Trash2,
-  PieChart,
+  PieChart as PieChartIcon,
   TrendingUp,
-  TrendingDown,
   Wallet,
   Briefcase,
-  Hash,
+  Minus,
+  Plus,
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+} from "recharts";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/layout/header";
 import { useShell } from "@/components/layout/shell";
 import { usePortfolio } from "@/context/portfolio-context";
@@ -75,79 +81,12 @@ export default function PortfolioPage() {
           </div>
         )}
 
-        {/* Weight Distribution Bar */}
-        {items.length > 0 && totalAmount > 0 && (
-          <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <PieChart className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">
-                  비중 배분
-                </span>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                수량 기반 자동 계산
-              </span>
-            </div>
-
-            {/* Stacked bar */}
-            <div className="flex h-3 overflow-hidden rounded-full bg-secondary">
-              {items.map((item) => {
-                const weight = getWeight(item.ticker);
-                if (weight <= 0) return null;
-                return (
-                  <div
-                    key={item.ticker}
-                    className="h-full transition-all duration-300"
-                    style={{
-                      width: `${weight}%`,
-                      backgroundColor: getBarColor(item.ticker),
-                    }}
-                    title={`${mockEtfs.find((e) => e.ticker === item.ticker)?.name} ${weight.toFixed(1)}%`}
-                  />
-                );
-              })}
-            </div>
-
-            {/* Legend */}
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
-              {items.map((item) => {
-                const weight = getWeight(item.ticker);
-                if (weight <= 0) return null;
-                const etf = mockEtfs.find((e) => e.ticker === item.ticker);
-                return (
-                  <div key={item.ticker} className="flex items-center gap-1.5">
-                    <div
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: getBarColor(item.ticker) }}
-                    />
-                    <span className="text-xs text-muted-foreground">
-                      {etf?.name?.slice(0, 10)} {weight.toFixed(1)}%
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Portfolio Items */}
-        <div className="rounded-lg border border-border bg-card">
-          <div className="flex items-center justify-between border-b border-border p-4 sm:p-5">
-            <h2 className="text-sm font-semibold text-foreground">
-              포트폴리오 구성
-            </h2>
-            {items.length > 0 && (
-              <span className="text-xs text-muted-foreground">
-                {items.length}개 종목
-              </span>
-            )}
-          </div>
-
-          {items.length === 0 ? (
+        {/* 비중 배분 + 포트폴리오 구성 (2-column) */}
+        {items.length === 0 ? (
+          <div className="rounded-lg border border-border bg-card">
             <div className="flex flex-col items-center justify-center gap-3 p-12">
               <div className="rounded-full bg-secondary p-3">
-                <PieChart className="h-6 w-6 text-muted-foreground" />
+                <PieChartIcon className="h-6 w-6 text-muted-foreground" />
               </div>
               <p className="text-sm text-muted-foreground">
                 아직 담은 ETF가 없습니다
@@ -158,130 +97,251 @@ export default function PortfolioPage() {
                 </Button>
               </Link>
             </div>
-          ) : (
-            <ul>
-              {items.map((item) => {
-                const etf = mockEtfs.find((e) => e.ticker === item.ticker);
-                if (!etf) return null;
-                const isPositive = etf.changeRate >= 0;
-                const amount = getAmount(item.ticker);
-                const weight = getWeight(item.ticker);
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {/* Left: 비중 배분 (도넛 차트) */}
+            <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <PieChartIcon className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">
+                    비중 배분
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  수량 기반 자동 계산
+                </span>
+              </div>
 
-                return (
-                  <li
-                    key={item.ticker}
-                    className="flex flex-col gap-3 border-b border-border p-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:p-5"
-                  >
-                    {/* Left: ETF info */}
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div className="min-w-0">
-                        <Link
-                          href={`/etf/${etf.ticker}`}
-                          className="truncate text-sm font-medium text-foreground hover:underline"
+              {totalAmount > 0 ? (
+                <>
+                  {/* Donut Chart */}
+                  <div className="mx-auto h-[220px] w-full max-w-[280px] sm:h-[260px] sm:max-w-[320px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={items
+                            .map((item, idx) => {
+                              const etf = mockEtfs.find((e) => e.ticker === item.ticker);
+                              const weight = getWeight(item.ticker);
+                              return {
+                                name: etf?.name?.slice(0, 10) ?? item.ticker,
+                                value: weight,
+                                ticker: item.ticker,
+                                color: getColorByIndex(idx),
+                              };
+                            })
+                            .filter((d) => d.value > 0)}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius="55%"
+                          outerRadius="85%"
+                          paddingAngle={2}
+                          dataKey="value"
+                          stroke="none"
                         >
-                          {etf.name}
-                        </Link>
-                        <div className="mt-0.5 flex items-center gap-2">
-                          <span className="font-mono text-xs text-muted-foreground">
-                            {etf.ticker}
+                          {items.map((_, idx) => (
+                            <Cell
+                              key={idx}
+                              fill={getColorByIndex(idx)}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<PieTooltipContent />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Legend */}
+                  <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1.5">
+                    {items.map((item, idx) => {
+                      const weight = getWeight(item.ticker);
+                      if (weight <= 0) return null;
+                      const etf = mockEtfs.find((e) => e.ticker === item.ticker);
+                      return (
+                        <div key={item.ticker} className="flex items-center gap-1.5">
+                          <div
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: getColorByIndex(idx) }}
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            {etf?.name?.slice(0, 10)} {weight.toFixed(1)}%
                           </span>
-                          <Badge
-                            variant="secondary"
-                            className="text-[10px] font-normal"
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+                  수량을 입력하면 비중이 계산됩니다
+                </div>
+              )}
+            </div>
+
+            {/* Right: 포트폴리오 구성 */}
+            <div className="rounded-lg border border-border bg-card">
+              <div className="flex items-center justify-between border-b border-border p-4 sm:p-5">
+                <h2 className="text-sm font-semibold text-foreground">
+                  포트폴리오 구성
+                </h2>
+                <span className="text-xs text-muted-foreground">
+                  {items.length}개 종목
+                </span>
+              </div>
+
+              <ul>
+                {items.map((item, idx) => {
+                  const etf = mockEtfs.find((e) => e.ticker === item.ticker);
+                  if (!etf) return null;
+                  const isPositive = etf.changeRate >= 0;
+                  const amount = getAmount(item.ticker);
+                  const weight = getWeight(item.ticker);
+
+                  return (
+                    <li
+                      key={item.ticker}
+                      className="border-b border-border p-4 last:border-b-0"
+                    >
+                      {/* Top row: ETF info + remove */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 overflow-hidden">
+                          <div
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: getColorByIndex(idx) }}
+                          />
+                          <div className="min-w-0">
+                            <Link
+                              href={`/etf/${etf.ticker}`}
+                              tabIndex={-1}
+                              className="truncate text-sm font-medium text-foreground hover:underline"
+                            >
+                              {etf.name}
+                            </Link>
+                            <div className="mt-0.5 flex items-center gap-2">
+                              <span className="font-mono text-xs text-muted-foreground">
+                                {etf.ticker}
+                              </span>
+                              <span
+                                className={cn(
+                                  "text-xs font-medium",
+                                  isPositive ? "text-emerald-400" : "text-red-400"
+                                )}
+                              >
+                                {isPositive ? "+" : ""}{etf.changeRate.toFixed(2)}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          tabIndex={-1}
+                          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-red-400"
+                          onClick={() => removeItem(item.ticker)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+
+                      {/* Bottom row: quantity stepper, amount, weight */}
+                      <div className="mt-2.5 flex items-center gap-3">
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            tabIndex={-1}
+                            onClick={() =>
+                              updateQuantity(item.ticker, Math.max(0, item.quantity - 1))
+                            }
+                            className="flex h-7 w-7 items-center justify-center rounded-l-md border border-input bg-secondary text-muted-foreground transition-colors hover:bg-secondary/80 hover:text-foreground"
                           >
-                            {etf.category}
-                          </Badge>
+                            <Minus className="h-3 w-3" />
+                          </button>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            tabIndex={0}
+                            value={item.quantity || ""}
+                            placeholder="0"
+                            onChange={(e) => {
+                              const v = parseInt(e.target.value, 10);
+                              updateQuantity(item.ticker, isNaN(v) ? 0 : Math.max(0, v));
+                            }}
+                            className="h-7 w-14 border-y border-input bg-background px-1 text-center font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          />
+                          <button
+                            type="button"
+                            tabIndex={-1}
+                            onClick={() =>
+                              updateQuantity(item.ticker, item.quantity + 1)
+                            }
+                            className="flex h-7 w-7 items-center justify-center rounded-r-md border border-input bg-secondary text-muted-foreground transition-colors hover:bg-secondary/80 hover:text-foreground"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                          <span className="ml-1.5 text-xs text-muted-foreground">주</span>
+                        </div>
+                        <div className="ml-auto text-right">
+                          <span className="font-mono text-sm text-foreground">
+                            {formatKRW(amount)}
+                          </span>
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {weight > 0 ? `${weight.toFixed(1)}%` : "-"}
+                          </span>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Right: price, quantity, amount, weight, actions */}
-                    <div className="flex items-center gap-3 sm:gap-4">
-                      {/* Current price & change */}
-                      <div className="hidden text-right sm:block">
-                        <p className="font-mono text-sm text-foreground">
-                          {formatKRW(etf.price)}
-                        </p>
-                        <p
-                          className={cn(
-                            "flex items-center justify-end gap-0.5 text-xs font-medium",
-                            isPositive ? "text-emerald-400" : "text-red-400"
-                          )}
-                        >
-                          {isPositive ? (
-                            <TrendingUp className="h-3 w-3" />
-                          ) : (
-                            <TrendingDown className="h-3 w-3" />
-                          )}
-                          {formatChangeRate(etf.changeRate)}
-                        </p>
-                      </div>
-
-                      {/* Quantity input */}
-                      <div className="flex items-center gap-1.5">
-                        <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-                        <input
-                          type="number"
-                          min={0}
-                          step={1}
-                          value={item.quantity || ""}
-                          placeholder="0"
-                          onChange={(e) => {
-                            const v = parseInt(e.target.value, 10);
-                            updateQuantity(item.ticker, isNaN(v) ? 0 : Math.max(0, v));
-                          }}
-                          className="h-8 w-16 rounded-md border border-input bg-background px-2 text-right font-mono text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                        />
-                        <span className="text-xs text-muted-foreground">주</span>
-                      </div>
-
-                      {/* Calculated amount & weight */}
-                      <div className="text-right">
-                        <p className="font-mono text-sm text-foreground">
-                          {formatKRW(amount)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {weight > 0 ? `${weight.toFixed(1)}%` : "-"}
-                        </p>
-                      </div>
-
-                      {/* Remove button */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-red-400"
-                        onClick={() => removeItem(item.ticker)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
 }
 
-const BAR_COLORS = [
-  "#34d399", "#60a5fa", "#f472b6", "#fbbf24",
-  "#a78bfa", "#fb923c", "#2dd4bf", "#e879f9",
-  "#4ade80", "#f87171", "#38bdf8", "#facc15",
-  "#c084fc", "#fb7185", "#22d3ee",
+/** 색상환에서 최대한 멀리 떨어진 색을 순서대로 배정 */
+const PIE_COLORS = [
+  "#34d399", // emerald
+  "#60a5fa", // blue
+  "#f472b6", // pink
+  "#fbbf24", // amber
+  "#a78bfa", // violet
+  "#fb923c", // orange
+  "#2dd4bf", // teal
+  "#e879f9", // fuchsia
+  "#38bdf8", // sky
+  "#f87171", // red
+  "#4ade80", // green
+  "#facc15", // yellow
+  "#c084fc", // purple
+  "#22d3ee", // cyan
+  "#fb7185", // rose
 ];
 
-function getBarColor(ticker: string): string {
-  let hash = 0;
-  for (let i = 0; i < ticker.length; i++) {
-    hash = ticker.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return BAR_COLORS[Math.abs(hash) % BAR_COLORS.length];
+function getColorByIndex(index: number): string {
+  return PIE_COLORS[index % PIE_COLORS.length];
+}
+
+function PieTooltipContent({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; payload: { ticker: string } }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const { name, value } = payload[0];
+  return (
+    <div className="rounded-lg border border-border bg-card/95 px-3 py-2 shadow-xl backdrop-blur-sm">
+      <p className="mb-0.5 text-xs font-medium text-muted-foreground">{name}</p>
+      <p className="text-sm font-bold text-foreground">{value.toFixed(1)}%</p>
+    </div>
+  );
 }
 
 function SummaryCard({

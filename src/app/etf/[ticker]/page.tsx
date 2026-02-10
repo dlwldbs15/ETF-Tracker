@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -20,7 +20,18 @@ import {
   CalendarClock,
   ShieldCheck,
   RefreshCw,
+  Lightbulb,
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
+} from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PriceLineChart } from "@/components/chart/price-line-chart";
@@ -184,8 +195,8 @@ export default function EtfDetailPage() {
         {/* Dividend Section */}
         <DividendSection etf={etf} />
 
-        {/* Dividend Reinvestment Simulation */}
-        <DividendReinvestSimulation etf={etf} />
+        {/* 장기 비용/수익 통합 분석기 */}
+        <IntegratedAnalyzer etf={etf} />
       </div>
     </div>
   );
@@ -340,11 +351,20 @@ function DividendSection({ etf }: { etf: EtfDetail }) {
   );
 }
 
-// ─── 배당 재투자 시뮬레이션 ──────────────────────────────
+// ─── 장기 비용/수익 통합 분석기 ──────────────────────────
 
+const YEARS_RANGE = Array.from({ length: 20 }, (_, i) => i + 1);
 const MILESTONES = [1, 3, 5, 10, 20] as const;
+const DIVIDEND_TAX_RATE = 0.154; // 배당소득세 15.4%
 
-function DividendReinvestSimulation({ etf }: { etf: EtfDetail }) {
+interface SimPoint {
+  year: number;
+  simple: number;
+  reinvest: number;
+  realNet: number;
+}
+
+function IntegratedAnalyzer({ etf }: { etf: EtfDetail }) {
   const { items } = usePortfolio();
   const portfolioItem = items.find((i) => i.ticker === etf.ticker);
   const quantity = portfolioItem?.quantity ?? 0;
@@ -353,121 +373,177 @@ function DividendReinvestSimulation({ etf }: { etf: EtfDetail }) {
   if (!hasDividend) return null;
 
   const totalInvestment = etf.price * quantity;
-  const rate = etf.dividendYield / 100;
+  const divRate = etf.dividendYield / 100;
+  const expRate = etf.expenseRatio / 100;
 
-  // 배당 주기에 따른 복리 횟수
   const compoundsPerYear =
     etf.dividendCycle === "월배당" ? 12 : etf.dividendCycle === "분기배당" ? 4 : 1;
-  const periodicRate = rate / compoundsPerYear;
+  const periodicDivRate = divRate / compoundsPerYear;
+  const periodicExpRate = expRate / compoundsPerYear;
 
-  // 시뮬레이션 결과 계산
-  const simulations = MILESTONES.map((year) => {
-    const periods = compoundsPerYear * year;
-    // 재투자 (복리)
-    const withReinvest = totalInvestment * Math.pow(1 + periodicRate, periods);
-    // 단순 수령 (단리)
-    const withoutReinvest = totalInvestment * (1 + rate * year);
-    const extra = withReinvest - withoutReinvest;
-    const extraPct =
-      totalInvestment > 0
-        ? ((withReinvest - totalInvestment) / totalInvestment) * 100
-        : 0;
-    const extraVsSimplePct =
-      withoutReinvest > totalInvestment
-        ? ((withReinvest - withoutReinvest) / (withoutReinvest - totalInvestment)) * 100
-        : 0;
+  const cycleLabel =
+    etf.dividendCycle === "월배당" ? "매달" : etf.dividendCycle === "분기배당" ? "매 분기" : "매년";
 
-    return { year, withReinvest, withoutReinvest, extra, extraPct, extraVsSimplePct };
-  });
+  // 차트 데이터: 1~20년
+  const chartData: SimPoint[] = useMemo(() => {
+    const useAmount = quantity > 0;
+    const base = useAmount ? totalInvestment : 100; // 수량 없으면 100 기준 (%)
 
-  const tenYear = simulations.find((s) => s.year === 10)!;
+    return YEARS_RANGE.map((year) => {
+      const periods = compoundsPerYear * year;
+
+      // 단순 투자 (배당 수령만, 재투자 X, 보수 차감 X)
+      const simple = base * (1 + divRate * year);
+
+      // 배당 재투자 (복리, 보수 차감 X)
+      const reinvest = base * Math.pow(1 + periodicDivRate, periods);
+
+      // 배당 재투자 + 보수 차감 (실질 순가치)
+      const netPeriodicRate = periodicDivRate - periodicExpRate;
+      const realNet = base * Math.pow(1 + netPeriodicRate, periods);
+
+      return {
+        year,
+        simple: Math.round(simple),
+        reinvest: Math.round(reinvest),
+        realNet: Math.round(realNet),
+      };
+    });
+  }, [totalInvestment, quantity, divRate, periodicDivRate, periodicExpRate, compoundsPerYear]);
+
+  // 마일스톤 테이블 데이터
+  const milestoneData = useMemo(() => {
+    return MILESTONES.map((year) => {
+      const point = chartData[year - 1];
+      return {
+        ...point,
+        expenseCost: point.reinvest - point.realNet,
+        reinvestGain: point.reinvest - point.simple,
+      };
+    });
+  }, [chartData]);
+
+  // 인사이트 계산 (10년 기준)
+  const tenYear = milestoneData.find((m) => m.year === 10)!;
+  const expenseCost10y = tenYear.reinvest - tenYear.realNet;
+  const reinvestGain10y = tenYear.reinvest - tenYear.simple;
+  const expenseOffsetPct = expenseCost10y > 0
+    ? ((reinvestGain10y / expenseCost10y) * 100)
+    : 0;
+
+  // ISA 절세 효과
+  const base = quantity > 0 ? totalInvestment : 0;
+  const annualDividend10y = base > 0 ? base * divRate * 10 : 0;
+  const taxSaved = annualDividend10y * DIVIDEND_TAX_RATE;
+  const isaBoostPct = base > 0 ? (taxSaved / base) * 100 : divRate * 10 * DIVIDEND_TAX_RATE * 100;
+
+  const hasQuantity = quantity > 0;
 
   return (
     <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
       <div className="mb-4 flex items-center gap-2">
         <RefreshCw className="h-5 w-5 text-emerald-400" />
         <h2 className="text-sm font-semibold text-foreground">
-          배당 재투자 효과
+          장기 비용/수익 통합 분석
         </h2>
         <Badge variant="secondary" className="text-[10px] font-normal">
           복리 시뮬레이션
         </Badge>
       </div>
 
-      {/* Highlight message */}
-      <div className="mb-4 rounded-lg bg-emerald-400/5 border border-emerald-400/20 p-3 sm:p-4">
-        <p className="text-sm leading-relaxed text-foreground">
-          {quantity > 0 ? (
-            <>
-              만약 받은 배당금을{" "}
-              <span className="font-semibold text-emerald-400">
-                {etf.dividendCycle === "월배당" ? "매달" : etf.dividendCycle === "분기배당" ? "매 분기" : "매년"} 재투자
-              </span>
-              한다면,{" "}
-              <span className="font-semibold text-amber-400">10년 후</span> 단순
-              배당 수령 대비 자산이 약{" "}
-              <span className="font-bold text-emerald-400">
-                {formatKRW(Math.round(tenYear.extra))}
-              </span>{" "}
-              더 늘어납니다.
-            </>
-          ) : (
-            <>
-              배당수익률{" "}
-              <span className="font-semibold text-amber-400">
-                {etf.dividendYield.toFixed(2)}%
-              </span>
-              로{" "}
-              <span className="font-semibold text-emerald-400">
-                {etf.dividendCycle === "월배당" ? "매달" : etf.dividendCycle === "분기배당" ? "매 분기" : "매년"} 재투자
-              </span>
-              하면,{" "}
-              <span className="font-semibold text-amber-400">10년 후</span>{" "}
-              총 수익이 약{" "}
-              <span className="font-bold text-emerald-400">
-                {tenYear.extraPct.toFixed(1)}%
-              </span>{" "}
-              증가합니다. 포트폴리오에 담으면 금액으로 확인할 수 있습니다.
-            </>
-          )}
-        </p>
+      {/* 비교 차트 */}
+      <div className="mb-5">
+        <h3 className="mb-3 text-xs font-medium text-muted-foreground">
+          20년 자산 가치 비교 {!hasQuantity && "(100 기준)"}
+        </h3>
+        <div className="h-[240px] w-full sm:h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(217 33% 17%)" vertical={false} />
+              <XAxis
+                dataKey="year"
+                tick={{ fontSize: 10, fill: "hsl(215 20% 55%)" }}
+                axisLine={{ stroke: "hsl(217 33% 17%)" }}
+                tickLine={false}
+                tickFormatter={(v: number) => `${v}년`}
+                interval={3}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: "hsl(215 20% 55%)" }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v: number) =>
+                  hasQuantity
+                    ? v >= 10000 ? `${Math.round(v / 10000)}만` : v.toLocaleString("ko-KR")
+                    : `${v}`
+                }
+                width={52}
+              />
+              <RechartsTooltip content={<AnalyzerTooltip hasQuantity={hasQuantity} />} />
+              <Legend
+                verticalAlign="top"
+                height={30}
+                formatter={(value: string) => (
+                  <span style={{ fontSize: 11, color: "hsl(215 20% 65%)" }}>{value}</span>
+                )}
+              />
+              <Line
+                type="monotone"
+                dataKey="simple"
+                name="단순 투자"
+                stroke="hsl(215 20% 55%)"
+                strokeWidth={1.5}
+                strokeDasharray="5 5"
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="reinvest"
+                name="배당 재투자"
+                stroke="#34d399"
+                strokeWidth={2}
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="realNet"
+                name="재투자 + 보수 차감"
+                stroke="#fbbf24"
+                strokeWidth={2}
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
-      {/* Simulation table */}
-      <div className="overflow-x-auto">
+      {/* 마일스톤 테이블 */}
+      <div className="mb-5 overflow-x-auto">
         <table className="w-full text-xs sm:text-sm">
           <thead>
             <tr className="border-b border-border">
               <th className="pb-2 text-left font-medium text-muted-foreground">기간</th>
-              <th className="pb-2 text-right font-medium text-muted-foreground">단순 수령</th>
-              <th className="pb-2 text-right font-medium text-emerald-400/70">재투자 (복리)</th>
-              <th className="pb-2 text-right font-medium text-muted-foreground">복리 효과</th>
+              <th className="pb-2 text-right font-medium text-muted-foreground">단순 투자</th>
+              <th className="pb-2 text-right font-medium text-emerald-400/70">배당 재투자</th>
+              <th className="pb-2 text-right font-medium text-amber-400/70">실질 순가치</th>
+              <th className="pb-2 text-right font-medium text-red-400/70">보수 누적</th>
             </tr>
           </thead>
           <tbody>
-            {simulations.map((sim) => (
-              <tr key={sim.year} className="border-b border-border/50 last:border-b-0">
-                <td className="py-2.5 font-medium text-foreground">{sim.year}년 후</td>
+            {milestoneData.map((row) => (
+              <tr key={row.year} className="border-b border-border/50 last:border-b-0">
+                <td className="py-2.5 font-medium text-foreground">{row.year}년</td>
                 <td className="py-2.5 text-right font-mono text-muted-foreground">
-                  {quantity > 0 ? (
-                    formatKRW(Math.round(sim.withoutReinvest))
-                  ) : (
-                    `+${(etf.dividendYield * sim.year).toFixed(1)}%`
-                  )}
+                  {hasQuantity ? formatKRW(row.simple) : row.simple}
                 </td>
                 <td className="py-2.5 text-right font-mono font-semibold text-emerald-400">
-                  {quantity > 0 ? (
-                    formatKRW(Math.round(sim.withReinvest))
-                  ) : (
-                    `+${sim.extraPct.toFixed(1)}%`
-                  )}
+                  {hasQuantity ? formatKRW(row.reinvest) : row.reinvest}
                 </td>
-                <td className="py-2.5 text-right font-mono text-amber-400">
-                  {quantity > 0 ? (
-                    `+${formatKRW(Math.round(sim.extra))}`
-                  ) : (
-                    `+${(sim.extraPct - etf.dividendYield * sim.year).toFixed(1)}%p`
-                  )}
+                <td className="py-2.5 text-right font-mono font-semibold text-amber-400">
+                  {hasQuantity ? formatKRW(row.realNet) : row.realNet}
+                </td>
+                <td className="py-2.5 text-right font-mono text-red-400">
+                  -{hasQuantity ? formatKRW(row.expenseCost) : row.expenseCost}
                 </td>
               </tr>
             ))}
@@ -475,10 +551,96 @@ function DividendReinvestSimulation({ etf }: { etf: EtfDetail }) {
         </table>
       </div>
 
-      <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-        * 배당수익률 {etf.dividendYield.toFixed(2)}% 고정, 주가 변동 미반영,
-        세전 기준의 단순 시뮬레이션입니다. 실제 수익은 시장 상황에 따라 달라질 수 있습니다.
+      {/* 인사이트 메시지 */}
+      <div className="space-y-2.5">
+        {/* 보수 기회비용 */}
+        <div className="rounded-lg border border-red-400/20 bg-red-400/5 p-3">
+          <p className="text-sm leading-relaxed text-foreground">
+            <span className="font-semibold text-amber-400">10년</span> 투자 시, 총보수(
+            {formatExpenseRatio(etf.expenseRatio)})로 인해 약{" "}
+            <span className="font-bold text-red-400">
+              {hasQuantity ? formatKRW(expenseCost10y) : `${((tenYear.reinvest - tenYear.realNet) / tenYear.reinvest * 100).toFixed(1)}%`}
+            </span>
+            의 기회비용이 발생합니다.
+          </p>
+        </div>
+
+        {/* 재투자 상쇄 효과 */}
+        <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/5 p-3">
+          <p className="text-sm leading-relaxed text-foreground">
+            {cycleLabel} 배당 재투자가 보수 비용을{" "}
+            <span className="font-bold text-emerald-400">
+              {expenseOffsetPct.toFixed(0)}%
+            </span>{" "}
+            상쇄합니다.
+            {hasQuantity && (
+              <>
+                {" "}재투자 복리 효과:{" "}
+                <span className="font-semibold text-emerald-400">
+                  +{formatKRW(reinvestGain10y)}
+                </span>
+              </>
+            )}
+          </p>
+        </div>
+
+        {/* ISA 절세 팁 */}
+        <div className="rounded-lg border border-blue-400/20 bg-blue-400/5 p-3">
+          <div className="flex items-start gap-2">
+            <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
+            <p className="text-sm leading-relaxed text-foreground">
+              <span className="font-semibold text-blue-400">ISA 계좌</span> 이용 시
+              배당소득세 15.4%를 절약하여 10년간 수익률을{" "}
+              <span className="font-bold text-blue-400">
+                {isaBoostPct.toFixed(1)}%
+              </span>{" "}
+              더 높일 수 있습니다.
+              {hasQuantity && (
+                <>
+                  {" "}(절세 효과: 약{" "}
+                  <span className="font-semibold text-blue-400">
+                    {formatKRW(Math.round(taxSaved))}
+                  </span>
+                  )
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
+        * 배당수익률 {etf.dividendYield.toFixed(2)}%, 총보수 {formatExpenseRatio(etf.expenseRatio)} 고정 가정.
+        주가 변동 미반영, 세전 기준의 단순 시뮬레이션입니다. ISA 비과세 한도(200~400만 원/연)는 별도 확인이 필요합니다.
       </p>
+    </div>
+  );
+}
+
+function AnalyzerTooltip({
+  active,
+  payload,
+  label,
+  hasQuantity,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string }>;
+  label?: number;
+  hasQuantity: boolean;
+}) {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <div className="rounded-lg border border-border bg-card/95 px-3.5 py-2.5 shadow-xl backdrop-blur-sm">
+      <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">{label}년 후</p>
+      {payload.map((entry) => (
+        <div key={entry.name} className="flex items-center justify-between gap-4">
+          <span className="text-[11px]" style={{ color: entry.color }}>{entry.name}</span>
+          <span className="font-mono text-xs font-semibold text-foreground">
+            {hasQuantity ? formatKRW(entry.value) : entry.value}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Header } from "@/components/layout/header";
 import { useShell } from "@/components/layout/shell";
 import { usePortfolio } from "@/context/portfolio-context";
-import { mockEtfs, getHoldings } from "@/lib/mock-data";
+import { mockEtfs, mockAssets, getHoldings } from "@/lib/mock-data";
 import {
   formatKRW,
   formatChangeRate,
@@ -29,13 +29,21 @@ import {
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Highlight } from "@/components/ui/highlight";
-import type { Etf } from "@/types/etf";
+import type { Asset, EtfAsset } from "@/types/asset";
+
+/* ── 자산 유형 탭 ──────────────────────────────────── */
+type AssetTab = "ALL" | "ETF" | "STOCK";
+const assetTabs: { key: AssetTab; label: string }[] = [
+  { key: "ALL", label: "전체" },
+  { key: "ETF", label: "ETF" },
+  { key: "STOCK", label: "주식" },
+];
 
 /* ── 테마 칩 정의 ──────────────────────────────────── */
 interface ThemeChip {
   key: string;
   label: string;
-  filter: (etf: Etf) => boolean;
+  filter: (etf: EtfAsset) => boolean;
 }
 
 const themeChips: ThemeChip[] = [
@@ -98,6 +106,7 @@ const DEFAULT_MIN_AUM = 0;
 export default function ExplorePage() {
   const { openSidebar } = useShell();
   const { addItem, items } = usePortfolio();
+  const [assetTab, setAssetTab] = useState<AssetTab>("ALL");
   const [activeTheme, setActiveTheme] = useState("all");
 
   /* ── 검색 상태 ────────────────────────────────────── */
@@ -138,12 +147,25 @@ export default function ExplorePage() {
     minAum > DEFAULT_MIN_AUM ||
     selectedCycles.length > 0;
 
-  /* ── 필터링된 ETF ────────────────────────────────── */
-  const filteredEtfs = useMemo(() => {
-    const chip = themeChips.find((c) => c.key === activeTheme);
-    let result = chip ? mockEtfs.filter(chip.filter) : mockEtfs;
+  const isEtfView = assetTab !== "STOCK";
 
-    // 검색어 필터
+  /* ── 필터링된 자산 ────────────────────────────────── */
+  const filteredAssets = useMemo(() => {
+    // 1. 자산 유형 필터
+    let result: Asset[] =
+      assetTab === "ETF" ? mockEtfs
+        : assetTab === "STOCK" ? [...mockAssets.filter((a) => a.type === "STOCK")]
+        : [...mockAssets];
+
+    // 2. 테마 칩 (ETF 전용) — 주식 탭에서는 무시
+    if (isEtfView && activeTheme !== "all") {
+      const chip = themeChips.find((c) => c.key === activeTheme);
+      if (chip) {
+        result = result.filter((a) => a.type === "ETF" && chip.filter(a));
+      }
+    }
+
+    // 3. 검색어
     const q = searchQuery.trim().toLowerCase();
     if (q) {
       result = result.filter(
@@ -153,22 +175,29 @@ export default function ExplorePage() {
       );
     }
 
-    result = result.filter((e) => e.expenseRatio <= maxExpense);
+    // 4. ETF 전용 필터 — 주식에는 적용하지 않음
+    if (isEtfView) {
+      result = result.filter((e) =>
+        e.type === "STOCK" || (e.type === "ETF" && e.expenseRatio <= maxExpense)
+      );
+    }
 
     if (minAum > 0) {
       result = result.filter((e) => e.marketCap >= minAum);
     }
 
-    if (selectedCycles.length > 0) {
-      result = result.filter((e) => selectedCycles.includes(e.dividendCycle));
+    if (isEtfView && selectedCycles.length > 0) {
+      result = result.filter((e) =>
+        e.type === "STOCK" || (e.type === "ETF" && selectedCycles.includes(e.dividendCycle))
+      );
     }
 
     return result;
-  }, [activeTheme, searchQuery, maxExpense, minAum, selectedCycles]);
+  }, [assetTab, isEtfView, activeTheme, searchQuery, maxExpense, minAum, selectedCycles]);
 
-  /* ── 지금 뜨는 ETF: 거래량 상위 3개 ──────────────── */
-  const trendingEtfs = useMemo(
-    () => [...mockEtfs].sort((a, b) => b.volume - a.volume).slice(0, 3),
+  /* ── 지금 뜨는 종목: 거래량 상위 3개 ──────────────── */
+  const trendingAssets = useMemo(
+    () => [...mockAssets].sort((a, b) => b.volume - a.volume).slice(0, 3),
     []
   );
 
@@ -178,35 +207,37 @@ export default function ExplorePage() {
   /* ── 필터 패널 콘텐츠 (desktop sidebar / mobile drawer 공용) */
   const filterContent = (
     <div className="space-y-6">
-      {/* 보수 (Expense Ratio) */}
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-xs font-medium text-foreground">
-            총보수 (Expense Ratio)
-          </span>
-          <span className="font-mono text-xs font-semibold text-[hsl(var(--sidebar-active))]">
-            &le; {maxExpense.toFixed(2)}%
-          </span>
+      {/* 보수 (Expense Ratio) — ETF 전용 */}
+      {isEtfView && (
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-xs font-medium text-foreground">
+              총보수 (Expense Ratio)
+            </span>
+            <span className="font-mono text-xs font-semibold text-[hsl(var(--sidebar-active))]">
+              &le; {maxExpense.toFixed(2)}%
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0.01}
+            max={1.0}
+            step={0.01}
+            value={maxExpense}
+            onChange={(e) => setMaxExpense(parseFloat(e.target.value))}
+            className="custom-slider w-full"
+          />
+          <div className="mt-1.5 flex justify-between text-[10px] text-muted-foreground">
+            <span>0.01%</span>
+            <span>1.00%</span>
+          </div>
         </div>
-        <input
-          type="range"
-          min={0.01}
-          max={1.0}
-          step={0.01}
-          value={maxExpense}
-          onChange={(e) => setMaxExpense(parseFloat(e.target.value))}
-          className="custom-slider w-full"
-        />
-        <div className="mt-1.5 flex justify-between text-[10px] text-muted-foreground">
-          <span>0.01%</span>
-          <span>1.00%</span>
-        </div>
-      </div>
+      )}
 
-      {/* 운용 자산 (AUM) */}
+      {/* 운용 자산 (AUM) / 시가총액 */}
       <div>
         <span className="mb-3 block text-xs font-medium text-foreground">
-          운용 자산 (AUM)
+          {isEtfView ? "운용 자산 (AUM)" : "시가총액"}
         </span>
         <div className="space-y-1.5">
           {aumOptions.map((opt) => (
@@ -226,49 +257,51 @@ export default function ExplorePage() {
         </div>
       </div>
 
-      {/* 배당 주기 */}
-      <div>
-        <span className="mb-3 block text-xs font-medium text-foreground">
-          배당 주기
-        </span>
-        <div className="space-y-2">
-          {dividendCycleOptions.map((opt) => (
-            <label
-              key={opt.value}
-              className="flex cursor-pointer items-center gap-2.5"
-              onClick={() => toggleCycle(opt.value)}
-            >
-              <div
-                className={cn(
-                  "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
-                  selectedCycles.includes(opt.value)
-                    ? "border-[hsl(var(--sidebar-active))] bg-[hsl(var(--sidebar-active))]"
-                    : "border-input bg-background"
-                )}
+      {/* 배당 주기 — ETF 전용 */}
+      {isEtfView && (
+        <div>
+          <span className="mb-3 block text-xs font-medium text-foreground">
+            배당 주기
+          </span>
+          <div className="space-y-2">
+            {dividendCycleOptions.map((opt) => (
+              <label
+                key={opt.value}
+                className="flex cursor-pointer items-center gap-2.5"
+                onClick={() => toggleCycle(opt.value)}
               >
-                {selectedCycles.includes(opt.value) && (
-                  <svg
-                    className="h-3 w-3 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={3}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                )}
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {opt.label}
-              </span>
-            </label>
-          ))}
+                <div
+                  className={cn(
+                    "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+                    selectedCycles.includes(opt.value)
+                      ? "border-[hsl(var(--sidebar-active))] bg-[hsl(var(--sidebar-active))]"
+                      : "border-input bg-background"
+                  )}
+                >
+                  {selectedCycles.includes(opt.value) && (
+                    <svg
+                      className="h-3 w-3 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={3}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  )}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {opt.label}
+                </span>
+              </label>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 초기화 */}
       {hasActiveFilters && (
@@ -286,8 +319,8 @@ export default function ExplorePage() {
   return (
     <>
       <Header
-        title="ETF 탐색"
-        description="다양한 ETF를 검색하고 비교하세요"
+        title="종목 탐색"
+        description="ETF와 주식을 검색하고 비교하세요"
         onMenuClick={openSidebar}
       />
 
@@ -369,17 +402,38 @@ export default function ExplorePage() {
             )}
           </div>
 
-          {/* ── 지금 뜨는 ETF ─────────────────────────── */}
+          {/* ── 자산 유형 탭 ──────────────────────────── */}
+          <div className="flex gap-1 rounded-lg border border-border bg-secondary/30 p-1">
+            {assetTabs.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => {
+                  setAssetTab(tab.key);
+                  if (tab.key === "STOCK") setActiveTheme("all");
+                }}
+                className={cn(
+                  "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  assetTab === tab.key
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── 지금 뜨는 종목 ─────────────────────────── */}
           <section>
             <div className="mb-3 flex items-center gap-2">
               <Flame className="h-5 w-5 text-orange-400" />
               <h2 className="text-sm font-semibold text-foreground sm:text-base">
-                지금 뜨는 ETF
+                지금 뜨는 종목
               </h2>
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {trendingEtfs.map((etf, idx) => {
+              {trendingAssets.map((etf, idx) => {
                 const isPositive = etf.changeRate >= 0;
                 return (
                   <Link
@@ -399,7 +453,7 @@ export default function ExplorePage() {
                     </p>
 
                     <p className="text-lg font-bold text-foreground">
-                      {formatKRW(etf.price)}
+                      {formatKRW(etf.currentPrice)}
                     </p>
 
                     <div className="mt-1.5 flex items-center justify-between">
@@ -448,38 +502,40 @@ export default function ExplorePage() {
             </div>
           </section>
 
-          {/* ── 인기 테마 칩 ──────────────────────────── */}
-          <section>
-            <div className="mb-3 flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-[hsl(var(--sidebar-active))]" />
-              <h2 className="text-sm font-semibold text-foreground sm:text-base">
-                인기 테마
-              </h2>
-            </div>
+          {/* ── 인기 테마 칩 (ETF 전용) ──────────────── */}
+          {assetTab !== "STOCK" && (
+            <section>
+              <div className="mb-3 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-[hsl(var(--sidebar-active))]" />
+                <h2 className="text-sm font-semibold text-foreground sm:text-base">
+                  인기 테마
+                </h2>
+              </div>
 
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {themeChips.map((chip) => (
-                <button
-                  key={chip.key}
-                  onClick={() => setActiveTheme(chip.key)}
-                  className={cn(
-                    "shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
-                    activeTheme === chip.key
-                      ? "border-[hsl(var(--sidebar-active))] bg-[hsl(var(--sidebar-active))]/15 text-[hsl(var(--sidebar-active))]"
-                      : "border-border bg-card text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground"
-                  )}
-                >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-          </section>
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {themeChips.map((chip) => (
+                  <button
+                    key={chip.key}
+                    onClick={() => setActiveTheme(chip.key)}
+                    className={cn(
+                      "shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+                      activeTheme === chip.key
+                        ? "border-[hsl(var(--sidebar-active))] bg-[hsl(var(--sidebar-active))]/15 text-[hsl(var(--sidebar-active))]"
+                        : "border-border bg-card text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground"
+                    )}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* ── 필터 결과 리스트 ──────────────────────── */}
           <section>
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm text-muted-foreground">
-                {filteredEtfs.length}개 종목
+                {filteredAssets.length}개 종목
               </span>
               {compareTickers.length > 0 && (
                 <span className="text-xs text-muted-foreground">
@@ -488,12 +544,12 @@ export default function ExplorePage() {
               )}
             </div>
 
-            {filteredEtfs.length === 0 ? (
+            {filteredAssets.length === 0 ? (
               <div className="flex h-40 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border">
                 <p className="text-sm text-muted-foreground">
                   {searchQuery.trim()
                     ? "검색 결과가 없습니다. 다른 검색어를 입력해 보세요."
-                    : "조건에 맞는 ETF가 없습니다"}
+                    : "조건에 맞는 종목이 없습니다"}
                 </p>
                 {searchQuery.trim() && (
                   <Button
@@ -509,7 +565,7 @@ export default function ExplorePage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {filteredEtfs.map((etf) => {
+                {filteredAssets.map((etf) => {
                   const isPositive = etf.changeRate >= 0;
                   const inPortfolio = isInPortfolio(etf.ticker);
                   const isCompareSelected = compareTickers.includes(etf.ticker);
@@ -557,7 +613,15 @@ export default function ExplorePage() {
                           <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">
                             {etf.category}
                           </span>
-                          {etf.dividendCycle === "월배당" && (
+                          <span className={cn(
+                            "rounded px-1.5 py-0.5 text-[10px] font-semibold",
+                            etf.type === "ETF"
+                              ? "bg-blue-500/15 text-blue-400"
+                              : "bg-emerald-500/15 text-emerald-400"
+                          )}>
+                            {etf.type === "ETF" ? "ETF" : "주식"}
+                          </span>
+                          {etf.type === "ETF" && etf.dividendCycle === "월배당" && (
                             <span className="rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
                               월배당
                             </span>
@@ -567,7 +631,7 @@ export default function ExplorePage() {
 
                       <div className="shrink-0 text-right">
                         <p className="font-mono text-sm font-medium text-foreground">
-                          {formatKRW(etf.price)}
+                          {formatKRW(etf.currentPrice)}
                         </p>
                         <span
                           className={cn(
@@ -619,7 +683,7 @@ export default function ExplorePage() {
           <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
             <div className="flex min-w-0 items-center gap-3">
               {compareTickers.map((ticker) => {
-                const etf = mockEtfs.find((e) => e.ticker === ticker);
+                const etf = mockAssets.find((e) => e.ticker === ticker);
                 return (
                   <div
                     key={ticker}
@@ -690,55 +754,82 @@ function CompareModal({
   tickerB: string;
   onClose: () => void;
 }) {
-  const etfA = mockEtfs.find((e) => e.ticker === tickerA);
-  const etfB = mockEtfs.find((e) => e.ticker === tickerB);
-  if (!etfA || !etfB) return null;
+  const assetA = mockAssets.find((e) => e.ticker === tickerA);
+  const assetB = mockAssets.find((e) => e.ticker === tickerB);
+  if (!assetA || !assetB) return null;
 
-  const holdingsA = getHoldings(tickerA).slice(0, 5);
-  const holdingsB = getHoldings(tickerB).slice(0, 5);
+  const bothEtf = assetA.type === "ETF" && assetB.type === "ETF";
+  const holdingsA = bothEtf ? getHoldings(tickerA).slice(0, 5) : [];
+  const holdingsB = bothEtf ? getHoldings(tickerB).slice(0, 5) : [];
 
   const rows: { label: string; a: string; b: string; better?: "a" | "b" | null }[] = [
     {
       label: "현재가",
-      a: formatKRW(etfA.price),
-      b: formatKRW(etfB.price),
+      a: formatKRW(assetA.currentPrice),
+      b: formatKRW(assetB.currentPrice),
     },
     {
       label: "등락률",
-      a: formatChangeRate(etfA.changeRate),
-      b: formatChangeRate(etfB.changeRate),
-      better: etfA.changeRate > etfB.changeRate ? "a" : etfA.changeRate < etfB.changeRate ? "b" : null,
-    },
-    {
-      label: "총보수",
-      a: formatExpenseRatio(etfA.expenseRatio),
-      b: formatExpenseRatio(etfB.expenseRatio),
-      better: etfA.expenseRatio < etfB.expenseRatio ? "a" : etfA.expenseRatio > etfB.expenseRatio ? "b" : null,
+      a: formatChangeRate(assetA.changeRate),
+      b: formatChangeRate(assetB.changeRate),
+      better: assetA.changeRate > assetB.changeRate ? "a" : assetA.changeRate < assetB.changeRate ? "b" : null,
     },
     {
       label: "배당 수익률",
-      a: etfA.dividendYield > 0 ? `${etfA.dividendYield.toFixed(2)}%` : "-",
-      b: etfB.dividendYield > 0 ? `${etfB.dividendYield.toFixed(2)}%` : "-",
-      better: etfA.dividendYield > etfB.dividendYield ? "a" : etfA.dividendYield < etfB.dividendYield ? "b" : null,
-    },
-    {
-      label: "배당 주기",
-      a: etfA.dividendCycle,
-      b: etfB.dividendCycle,
+      a: assetA.dividendYield > 0 ? `${assetA.dividendYield.toFixed(2)}%` : "-",
+      b: assetB.dividendYield > 0 ? `${assetB.dividendYield.toFixed(2)}%` : "-",
+      better: assetA.dividendYield > assetB.dividendYield ? "a" : assetA.dividendYield < assetB.dividendYield ? "b" : null,
     },
     {
       label: "시가총액",
-      a: formatMarketCap(etfA.marketCap),
-      b: formatMarketCap(etfB.marketCap),
-      better: etfA.marketCap > etfB.marketCap ? "a" : etfA.marketCap < etfB.marketCap ? "b" : null,
+      a: formatMarketCap(assetA.marketCap),
+      b: formatMarketCap(assetB.marketCap),
+      better: assetA.marketCap > assetB.marketCap ? "a" : assetA.marketCap < assetB.marketCap ? "b" : null,
     },
     {
       label: "거래량",
-      a: formatVolume(etfA.volume),
-      b: formatVolume(etfB.volume),
-      better: etfA.volume > etfB.volume ? "a" : etfA.volume < etfB.volume ? "b" : null,
+      a: formatVolume(assetA.volume),
+      b: formatVolume(assetB.volume),
+      better: assetA.volume > assetB.volume ? "a" : assetA.volume < assetB.volume ? "b" : null,
     },
   ];
+
+  // ETF 전용 행 추가
+  if (bothEtf) {
+    rows.splice(2, 0, {
+      label: "총보수",
+      a: formatExpenseRatio(assetA.expenseRatio),
+      b: formatExpenseRatio(assetB.expenseRatio),
+      better: assetA.expenseRatio < assetB.expenseRatio ? "a" : assetA.expenseRatio > assetB.expenseRatio ? "b" : null,
+    });
+    rows.splice(4, 0, {
+      label: "배당 주기",
+      a: assetA.dividendCycle,
+      b: assetB.dividendCycle,
+    });
+  }
+
+  // 주식 전용 행 추가
+  const bothStock = assetA.type === "STOCK" && assetB.type === "STOCK";
+  if (bothStock) {
+    rows.splice(2, 0, {
+      label: "PER",
+      a: `${assetA.per.toFixed(1)}배`,
+      b: `${assetB.per.toFixed(1)}배`,
+      better: assetA.per < assetB.per ? "a" : assetA.per > assetB.per ? "b" : null,
+    });
+    rows.splice(3, 0, {
+      label: "PBR",
+      a: `${assetA.pbr.toFixed(2)}배`,
+      b: `${assetB.pbr.toFixed(2)}배`,
+      better: assetA.pbr < assetB.pbr ? "a" : assetA.pbr > assetB.pbr ? "b" : null,
+    });
+  }
+
+  const subtitle = (asset: Asset) => {
+    if (asset.type === "ETF") return `${asset.ticker} · ${asset.issuer}`;
+    return `${asset.ticker} · ${asset.sector}`;
+  };
 
   return (
     <>
@@ -759,7 +850,7 @@ function CompareModal({
             <div className="flex items-center gap-2">
               <GitCompareArrows className="h-5 w-5 text-[hsl(var(--sidebar-active))]" />
               <h2 className="text-base font-semibold text-foreground">
-                ETF 비교
+                종목 비교
               </h2>
             </div>
             <button
@@ -770,15 +861,25 @@ function CompareModal({
             </button>
           </div>
 
-          {/* ETF 이름 헤더 */}
+          {/* 종목 이름 헤더 */}
           <div className="grid grid-cols-[1fr_1fr] gap-px border-b border-border bg-border">
-            {[etfA, etfB].map((etf) => (
-              <div key={etf.ticker} className="bg-card px-4 py-3 sm:px-5">
-                <p className="text-sm font-semibold text-foreground line-clamp-1">
-                  {etf.name}
-                </p>
+            {[assetA, assetB].map((asset) => (
+              <div key={asset.ticker} className="bg-card px-4 py-3 sm:px-5">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-foreground line-clamp-1">
+                    {asset.name}
+                  </p>
+                  <span className={cn(
+                    "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold",
+                    asset.type === "ETF"
+                      ? "bg-blue-500/15 text-blue-400"
+                      : "bg-emerald-500/15 text-emerald-400"
+                  )}>
+                    {asset.type === "ETF" ? "ETF" : "주식"}
+                  </span>
+                </div>
                 <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                  {etf.ticker} · {etf.provider}
+                  {subtitle(asset)}
                 </p>
               </div>
             ))}
@@ -832,50 +933,52 @@ function CompareModal({
             ))}
           </div>
 
-          {/* 주요 구성 종목 */}
-          <div className="border-t border-border">
-            <div className="px-4 py-3 sm:px-5">
-              <p className="text-xs font-semibold text-foreground">
-                주요 구성 종목 (Top 5)
-              </p>
-            </div>
-            <div className="grid grid-cols-[1fr_1fr] gap-px border-t border-border bg-border">
-              <div className="bg-card px-4 pb-4 pt-2 sm:px-5">
-                <ul className="space-y-1.5">
-                  {holdingsA.map((h) => (
-                    <li
-                      key={h.ticker}
-                      className="flex items-center justify-between"
-                    >
-                      <span className="truncate text-xs text-muted-foreground">
-                        {h.name}
-                      </span>
-                      <span className="ml-2 shrink-0 font-mono text-xs text-foreground">
-                        {h.weight.toFixed(1)}%
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+          {/* 주요 구성 종목 (ETF끼리 비교 시에만) */}
+          {bothEtf && (
+            <div className="border-t border-border">
+              <div className="px-4 py-3 sm:px-5">
+                <p className="text-xs font-semibold text-foreground">
+                  주요 구성 종목 (Top 5)
+                </p>
               </div>
-              <div className="bg-card px-4 pb-4 pt-2 sm:px-5">
-                <ul className="space-y-1.5">
-                  {holdingsB.map((h) => (
-                    <li
-                      key={h.ticker}
-                      className="flex items-center justify-between"
-                    >
-                      <span className="truncate text-xs text-muted-foreground">
-                        {h.name}
-                      </span>
-                      <span className="ml-2 shrink-0 font-mono text-xs text-foreground">
-                        {h.weight.toFixed(1)}%
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+              <div className="grid grid-cols-[1fr_1fr] gap-px border-t border-border bg-border">
+                <div className="bg-card px-4 pb-4 pt-2 sm:px-5">
+                  <ul className="space-y-1.5">
+                    {holdingsA.map((h) => (
+                      <li
+                        key={h.ticker}
+                        className="flex items-center justify-between"
+                      >
+                        <span className="truncate text-xs text-muted-foreground">
+                          {h.name}
+                        </span>
+                        <span className="ml-2 shrink-0 font-mono text-xs text-foreground">
+                          {h.weight.toFixed(1)}%
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="bg-card px-4 pb-4 pt-2 sm:px-5">
+                  <ul className="space-y-1.5">
+                    {holdingsB.map((h) => (
+                      <li
+                        key={h.ticker}
+                        className="flex items-center justify-between"
+                      >
+                        <span className="truncate text-xs text-muted-foreground">
+                          {h.name}
+                        </span>
+                        <span className="ml-2 shrink-0 font-mono text-xs text-foreground">
+                          {h.weight.toFixed(1)}%
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Footer */}
           <div className="flex justify-end border-t border-border px-5 py-3">

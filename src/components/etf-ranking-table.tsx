@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Etf } from "@/types/etf";
+import type { Asset } from "@/types/asset";
 import { usePortfolio } from "@/context/portfolio-context";
 import {
   formatKRW,
@@ -25,11 +25,18 @@ import {
 import { cn } from "@/lib/utils";
 import { Highlight } from "@/components/ui/highlight";
 
-type SortKey = "price" | "changeRate" | "marketCap" | "volume" | "expenseRatio" | "dividendYield";
+type SortKey = "currentPrice" | "changeRate" | "marketCap" | "volume" | "expenseRatio" | "dividendYield";
 type SortDir = "asc" | "desc";
 
+function getSortValue(asset: Asset, key: SortKey): number {
+  if (key === "expenseRatio") {
+    return asset.type === "ETF" ? asset.expenseRatio : 0;
+  }
+  return asset[key];
+}
+
 interface EtfRankingTableProps {
-  data: Etf[];
+  data: Asset[];
   searchQuery?: string;
 }
 
@@ -51,9 +58,9 @@ export function EtfRankingTable({ data, searchQuery = "" }: EtfRankingTableProps
   const sorted = useMemo(() => {
     if (!sortKey) return data;
     return [...data].sort((a, b) => {
-      const aVal = a[sortKey];
-      const bVal = b[sortKey];
-      return sortDir === "desc" ? (bVal as number) - (aVal as number) : (aVal as number) - (bVal as number);
+      const aVal = getSortValue(a, sortKey);
+      const bVal = getSortValue(b, sortKey);
+      return sortDir === "desc" ? bVal - aVal : aVal - bVal;
     });
   }, [data, sortKey, sortDir]);
 
@@ -89,6 +96,14 @@ export function EtfRankingTable({ data, searchQuery = "" }: EtfRankingTableProps
                   <p className="truncate text-sm font-medium text-foreground">
                     <Highlight text={etf.name} query={searchQuery} />
                   </p>
+                  <span className={cn(
+                    "shrink-0 rounded px-1 py-0.5 text-[10px] font-semibold",
+                    etf.type === "ETF"
+                      ? "bg-blue-500/15 text-blue-400"
+                      : "bg-emerald-500/15 text-emerald-400"
+                  )}>
+                    {etf.type === "ETF" ? "ETF" : "주식"}
+                  </span>
                   {etf.dividendYield > 0 && (
                     <span className="shrink-0 text-[10px] font-medium text-amber-400">
                       {etf.dividendYield.toFixed(1)}%
@@ -108,7 +123,7 @@ export function EtfRankingTable({ data, searchQuery = "" }: EtfRankingTableProps
               {/* Price + Change */}
               <div className="shrink-0 text-right">
                 <p className="font-mono text-sm font-medium text-foreground">
-                  {formatKRW(etf.price)}
+                  {formatKRW(etf.currentPrice)}
                 </p>
                 <p
                   className={cn(
@@ -157,7 +172,7 @@ export function EtfRankingTable({ data, searchQuery = "" }: EtfRankingTableProps
               <TableHead className="w-12 text-muted-foreground">순위</TableHead>
               <TableHead className="text-muted-foreground">종목명</TableHead>
               <TableHead className="text-muted-foreground">티커</TableHead>
-              <SortableHead label="현재가" sortKey="price" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
+              <SortableHead label="현재가" sortKey="currentPrice" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
               <SortableHead label="등락률" sortKey="changeRate" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
               <SortableHead label="배당률" sortKey="dividendYield" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
               <SortableHead label="시가총액" sortKey="marketCap" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
@@ -180,13 +195,23 @@ export function EtfRankingTable({ data, searchQuery = "" }: EtfRankingTableProps
                     {index + 1}
                   </TableCell>
                   <TableCell className="font-medium text-foreground">
-                    <Highlight text={etf.name} query={searchQuery} />
+                    <div className="flex items-center gap-2">
+                      <Highlight text={etf.name} query={searchQuery} />
+                      <span className={cn(
+                        "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold",
+                        etf.type === "ETF"
+                          ? "bg-blue-500/15 text-blue-400"
+                          : "bg-emerald-500/15 text-emerald-400"
+                      )}>
+                        {etf.type === "ETF" ? "ETF" : "주식"}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell className="font-mono text-sm text-muted-foreground">
                     <Highlight text={etf.ticker} query={searchQuery} />
                   </TableCell>
                   <TableCell className="text-right font-mono text-foreground">
-                    {formatKRW(etf.price)}
+                    {formatKRW(etf.currentPrice)}
                   </TableCell>
                   <TableCell className="text-right">
                     <span
@@ -218,7 +243,7 @@ export function EtfRankingTable({ data, searchQuery = "" }: EtfRankingTableProps
                     {formatVolume(etf.volume)}
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                    {formatExpenseRatio(etf.expenseRatio)}
+                    {etf.type === "ETF" ? formatExpenseRatio(etf.expenseRatio) : "-"}
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="text-xs font-normal">

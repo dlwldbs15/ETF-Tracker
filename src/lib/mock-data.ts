@@ -1,11 +1,17 @@
-import { Etf, EtfDetail, PricePoint, Holding } from "@/types/etf";
+import type { EtfAsset, StockAsset, Asset, EtfAssetDetail, StockAssetDetail, AssetDetail } from "@/types/asset";
+import type { PricePoint, Holding } from "@/types/etf";
 
-export const mockEtfs: Etf[] = [
+// ─── ETF 목 데이터 ──────────────────────────────────────────
+
+export const mockEtfs: EtfAsset[] = [
   {
+    id: "etf-069500",
+    type: "ETF",
     ticker: "069500",
     name: "KODEX 200",
-    provider: "삼성자산운용",
-    price: 35420,
+    issuer: "삼성자산운용",
+    currentPrice: 35420,
+    nav: 35450,
     changeRate: 1.23,
     marketCap: 5_8234_0000_0000,
     expenseRatio: 0.15,
@@ -16,10 +22,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 160,
   },
   {
+    id: "etf-133690",
+    type: "ETF",
     ticker: "133690",
     name: "TIGER 미국나스닥100",
-    provider: "미래에셋자산운용",
-    price: 98750,
+    issuer: "미래에셋자산운용",
+    currentPrice: 98750,
+    nav: 98820,
     changeRate: 2.15,
     marketCap: 8_4521_0000_0000,
     expenseRatio: 0.07,
@@ -30,10 +39,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 125,
   },
   {
+    id: "etf-278530",
+    type: "ETF",
     ticker: "278530",
     name: "RISE 200",
-    provider: "KB자산운용",
-    price: 11230,
+    issuer: "KB자산운용",
+    currentPrice: 11230,
+    nav: 11245,
     changeRate: -0.87,
     marketCap: 1_2340_0000_0000,
     expenseRatio: 0.017,
@@ -44,10 +56,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 55,
   },
   {
+    id: "etf-371460",
+    type: "ETF",
     ticker: "371460",
     name: "TIGER 차이나전기차SOLACTIVE",
-    provider: "미래에셋자산운용",
-    price: 7890,
+    issuer: "미래에셋자산운용",
+    currentPrice: 7890,
+    nav: 7910,
     changeRate: -2.34,
     marketCap: 9870_0000_0000,
     expenseRatio: 0.49,
@@ -58,10 +73,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 0,
   },
   {
+    id: "etf-381180",
+    type: "ETF",
     ticker: "381180",
     name: "TIGER 미국S&P500",
-    provider: "미래에셋자산운용",
-    price: 17850,
+    issuer: "미래에셋자산운용",
+    currentPrice: 17850,
+    nav: 17870,
     changeRate: 0.89,
     marketCap: 4_5600_0000_0000,
     expenseRatio: 0.07,
@@ -72,10 +90,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 54,
   },
   {
+    id: "etf-305720",
+    type: "ETF",
     ticker: "305720",
     name: "KODEX 2차전지산업",
-    provider: "삼성자산운용",
-    price: 8765,
+    issuer: "삼성자산운용",
+    currentPrice: 8765,
+    nav: 8780,
     changeRate: -1.45,
     marketCap: 7560_0000_0000,
     expenseRatio: 0.45,
@@ -86,10 +107,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 0,
   },
   {
+    id: "etf-379810",
+    type: "ETF",
     ticker: "379810",
     name: "KODEX 미국S&P500TR",
-    provider: "삼성자산운용",
-    price: 14560,
+    issuer: "삼성자산운용",
+    currentPrice: 14560,
+    nav: 14580,
     changeRate: 1.02,
     marketCap: 3_2100_0000_0000,
     expenseRatio: 0.05,
@@ -100,10 +124,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 0,
   },
   {
+    id: "etf-364690",
+    type: "ETF",
     ticker: "364690",
     name: "KODEX Fn반도체",
-    provider: "삼성자산운용",
-    price: 11890,
+    issuer: "삼성자산운용",
+    currentPrice: 11890,
+    nav: 11910,
     changeRate: 3.21,
     marketCap: 1_8760_0000_0000,
     expenseRatio: 0.45,
@@ -114,10 +141,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 42,
   },
   {
+    id: "etf-261240",
+    type: "ETF",
     ticker: "261240",
     name: "RISE 미국S&P500",
-    provider: "KB자산운용",
-    price: 18920,
+    issuer: "KB자산운용",
+    currentPrice: 18920,
+    nav: 18940,
     changeRate: 0.56,
     marketCap: 2_1300_0000_0000,
     expenseRatio: 0.021,
@@ -128,10 +158,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 56,
   },
   {
+    id: "etf-252670",
+    type: "ETF",
     ticker: "252670",
     name: "KODEX 200선물인버스2X",
-    provider: "삼성자산운용",
-    price: 2340,
+    issuer: "삼성자산운용",
+    currentPrice: 2340,
+    nav: 2345,
     changeRate: -3.21,
     marketCap: 4_3210_0000_0000,
     expenseRatio: 0.64,
@@ -142,10 +175,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 0,
   },
   {
+    id: "etf-102110",
+    type: "ETF",
     ticker: "102110",
     name: "TIGER 200",
-    provider: "미래에셋자산운용",
-    price: 35680,
+    issuer: "미래에셋자산운용",
+    currentPrice: 35680,
+    nav: 35710,
     changeRate: 1.18,
     marketCap: 3_9800_0000_0000,
     expenseRatio: 0.05,
@@ -156,10 +192,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 158,
   },
   {
+    id: "etf-114800",
+    type: "ETF",
     ticker: "114800",
     name: "KODEX 인버스",
-    provider: "삼성자산운용",
-    price: 4120,
+    issuer: "삼성자산운용",
+    currentPrice: 4120,
+    nav: 4125,
     changeRate: -1.52,
     marketCap: 2_8900_0000_0000,
     expenseRatio: 0.64,
@@ -170,10 +209,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 0,
   },
   {
+    id: "etf-229200",
+    type: "ETF",
     ticker: "229200",
     name: "KODEX 코스닥150",
-    provider: "삼성자산운용",
-    price: 12340,
+    issuer: "삼성자산운용",
+    currentPrice: 12340,
+    nav: 12360,
     changeRate: -0.32,
     marketCap: 8900_0000_0000,
     expenseRatio: 0.25,
@@ -184,10 +226,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 52,
   },
   {
+    id: "etf-091160",
+    type: "ETF",
     ticker: "091160",
     name: "KODEX 반도체",
-    provider: "삼성자산운용",
-    price: 34500,
+    issuer: "삼성자산운용",
+    currentPrice: 34500,
+    nav: 34530,
     changeRate: 2.87,
     marketCap: 1_5670_0000_0000,
     expenseRatio: 0.45,
@@ -198,10 +243,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 97,
   },
   {
+    id: "etf-453810",
+    type: "ETF",
     ticker: "453810",
     name: "RISE 미국나스닥100",
-    provider: "KB자산운용",
-    price: 15670,
+    issuer: "KB자산운용",
+    currentPrice: 15670,
+    nav: 15690,
     changeRate: 1.95,
     marketCap: 6780_0000_0000,
     expenseRatio: 0.021,
@@ -212,10 +260,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 19,
   },
   {
+    id: "etf-458730",
+    type: "ETF",
     ticker: "458730",
     name: "TIGER 미국배당다우존스",
-    provider: "미래에셋자산운용",
-    price: 12850,
+    issuer: "미래에셋자산운용",
+    currentPrice: 12850,
+    nav: 12870,
     changeRate: 0.64,
     marketCap: 3_1200_0000_0000,
     expenseRatio: 0.01,
@@ -226,10 +277,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 38,
   },
   {
+    id: "etf-441800",
+    type: "ETF",
     ticker: "441800",
     name: "TIGER 미국배당+7%프리미엄다우존스",
-    provider: "미래에셋자산운용",
-    price: 11340,
+    issuer: "미래에셋자산운용",
+    currentPrice: 11340,
+    nav: 11360,
     changeRate: 0.32,
     marketCap: 1_8500_0000_0000,
     expenseRatio: 0.39,
@@ -240,10 +294,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 68,
   },
   {
+    id: "etf-446720",
+    type: "ETF",
     ticker: "446720",
     name: "KODEX 미국배당다우존스",
-    provider: "삼성자산운용",
-    price: 12420,
+    issuer: "삼성자산운용",
+    currentPrice: 12420,
+    nav: 12440,
     changeRate: 0.58,
     marketCap: 1_2300_0000_0000,
     expenseRatio: 0.01,
@@ -254,10 +311,13 @@ export const mockEtfs: Etf[] = [
     lastDividendAmount: 36,
   },
   {
+    id: "etf-490600",
+    type: "ETF",
     ticker: "490600",
     name: "RISE 미국배당다우존스",
-    provider: "KB자산운용",
-    price: 10870,
+    issuer: "KB자산운용",
+    currentPrice: 10870,
+    nav: 10890,
     changeRate: 0.45,
     marketCap: 4560_0000_0000,
     expenseRatio: 0.01,
@@ -269,11 +329,97 @@ export const mockEtfs: Etf[] = [
   },
 ];
 
-export const providers = Array.from(new Set(mockEtfs.map((e) => e.provider)));
+// ─── 주식 목 데이터 ─────────────────────────────────────────
 
-// ─── ETF 상세 정보 ──────────────────────────────────────
+export const mockStocks: StockAsset[] = [
+  {
+    id: "stock-005930",
+    type: "STOCK",
+    ticker: "005930",
+    name: "삼성전자",
+    currentPrice: 72400,
+    changeRate: 1.54,
+    marketCap: 432_1200_0000_0000,
+    volume: 15_230_000,
+    category: "전자/반도체",
+    dividendYield: 2.07,
+    sector: "반도체",
+    per: 13.2,
+    pbr: 1.15,
+  },
+  {
+    id: "stock-000660",
+    type: "STOCK",
+    ticker: "000660",
+    name: "SK하이닉스",
+    currentPrice: 178500,
+    changeRate: 2.87,
+    marketCap: 129_8700_0000_0000,
+    volume: 4_560_000,
+    category: "전자/반도체",
+    dividendYield: 0.67,
+    sector: "반도체",
+    per: 8.5,
+    pbr: 1.82,
+  },
+  {
+    id: "stock-005380",
+    type: "STOCK",
+    ticker: "005380",
+    name: "현대차",
+    currentPrice: 245000,
+    changeRate: -0.41,
+    marketCap: 52_3400_0000_0000,
+    volume: 1_890_000,
+    category: "자동차",
+    dividendYield: 3.27,
+    sector: "자동차",
+    per: 5.8,
+    pbr: 0.62,
+  },
+  {
+    id: "stock-035420",
+    type: "STOCK",
+    ticker: "035420",
+    name: "NAVER",
+    currentPrice: 215000,
+    changeRate: 0.94,
+    marketCap: 35_2100_0000_0000,
+    volume: 1_230_000,
+    category: "IT/플랫폼",
+    dividendYield: 0.42,
+    sector: "인터넷",
+    per: 24.3,
+    pbr: 1.45,
+  },
+  {
+    id: "stock-068270",
+    type: "STOCK",
+    ticker: "068270",
+    name: "셀트리온",
+    currentPrice: 198000,
+    changeRate: -1.25,
+    marketCap: 28_1400_0000_0000,
+    volume: 2_340_000,
+    category: "바이오",
+    dividendYield: 0.25,
+    sector: "바이오",
+    per: 38.7,
+    pbr: 3.21,
+  },
+];
 
-const detailMap: Record<string, { benchmark: string; listingDate: string }> = {
+// ─── 통합 자산 배열 ──────────────────────────────────────────
+
+export const mockAssets: Asset[] = [...mockEtfs, ...mockStocks];
+
+export const issuers = Array.from(new Set(mockEtfs.map((e) => e.issuer)));
+/** @deprecated providers 대신 issuers 사용 */
+export const providers = issuers;
+
+// ─── ETF 상세 정보 ──────────────────────────────────────────
+
+const etfDetailMap: Record<string, { benchmark: string; listingDate: string }> = {
   "069500": { benchmark: "KOSPI 200", listingDate: "2002-10-14" },
   "133690": { benchmark: "NASDAQ 100", listingDate: "2010-10-18" },
   "278530": { benchmark: "KOSPI 200", listingDate: "2017-08-29" },
@@ -295,22 +441,51 @@ const detailMap: Record<string, { benchmark: string; listingDate: string }> = {
   "490600": { benchmark: "Dow Jones U.S. Dividend 100", listingDate: "2024-01-23" },
 };
 
-export function getEtfDetail(ticker: string): EtfDetail | null {
+export function getEtfDetail(ticker: string): EtfAssetDetail | null {
   const etf = mockEtfs.find((e) => e.ticker === ticker);
   if (!etf) return null;
-  const detail = detailMap[ticker] ?? { benchmark: "-", listingDate: "2020-01-01" };
+  const detail = etfDetailMap[ticker] ?? { benchmark: "-", listingDate: "2020-01-01" };
   return { ...etf, ...detail };
 }
 
-// ─── 가격 히스토리 생성 (최근 30일) ─────────────────────
+// ─── 주식 상세 정보 ──────────────────────────────────────────
+
+const stockDetailMap: Record<string, { description: string; listingDate: string; employees: number; revenue: number; operatingProfit: number; netIncome: number }> = {
+  "005930": { description: "반도체, 스마트폰, 디스플레이 등을 제조하는 글로벌 전자기업", listingDate: "1975-06-11", employees: 267937, revenue: 258_9400_0000_0000, operatingProfit: 6_5700_0000_0000, netIncome: 15_4800_0000_0000 },
+  "000660": { description: "DRAM, NAND Flash 등 메모리 반도체를 제조하는 기업", listingDate: "1996-12-26", employees: 35000, revenue: 66_1900_0000_0000, operatingProfit: 28_8800_0000_0000, netIncome: 19_5700_0000_0000 },
+  "005380": { description: "승용차, 상용차 및 자동차 부품을 제조·판매하는 자동차 기업", listingDate: "1974-06-28", employees: 75000, revenue: 162_6600_0000_0000, operatingProfit: 14_8700_0000_0000, netIncome: 12_2700_0000_0000 },
+  "035420": { description: "검색, 커머스, 핀테크, 콘텐츠 등 인터넷 플랫폼 기업", listingDate: "2002-10-29", employees: 4500, revenue: 9_6700_0000_0000, operatingProfit: 1_5800_0000_0000, netIncome: 1_0500_0000_0000 },
+  "068270": { description: "바이오시밀러 및 항체 의약품을 개발·생산하는 바이오 기업", listingDate: "2018-11-08", employees: 8500, revenue: 3_5200_0000_0000, operatingProfit: 5800_0000_0000, netIncome: 4200_0000_0000 },
+};
+
+export function getStockDetail(ticker: string): StockAssetDetail | null {
+  const stock = mockStocks.find((s) => s.ticker === ticker);
+  if (!stock) return null;
+  const detail = stockDetailMap[ticker] ?? {
+    description: "-",
+    listingDate: "2000-01-01",
+    employees: 0,
+    revenue: 0,
+    operatingProfit: 0,
+    netIncome: 0,
+  };
+  return { ...stock, ...detail };
+}
+
+// ─── 통합 상세 조회 ──────────────────────────────────────────
+
+export function getAssetDetail(ticker: string): AssetDetail | null {
+  return getEtfDetail(ticker) ?? getStockDetail(ticker);
+}
+
+// ─── 가격 히스토리 생성 (최근 30일) ─────────────────────────
 
 export function generatePriceHistory(ticker: string): PricePoint[] {
-  const etf = mockEtfs.find((e) => e.ticker === ticker);
-  if (!etf) return [];
+  const asset = mockAssets.find((a) => a.ticker === ticker);
+  if (!asset) return [];
 
   const points: PricePoint[] = [];
-  const basePrice = etf.price;
-  // seed from ticker for consistent results
+  const basePrice = asset.currentPrice;
   let seed = 0;
   for (let i = 0; i < ticker.length; i++) {
     seed += ticker.charCodeAt(i);
@@ -320,7 +495,6 @@ export function generatePriceHistory(ticker: string): PricePoint[] {
   for (let i = 29; i >= 0; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
-    // deterministic pseudo-random walk
     seed = (seed * 9301 + 49297) % 233280;
     const rnd = seed / 233280;
     const change = (rnd - 0.45) * basePrice * 0.02;
@@ -334,7 +508,7 @@ export function generatePriceHistory(ticker: string): PricePoint[] {
   return points;
 }
 
-// ─── 구성 종목(Holdings) ────────────────────────────────
+// ─── 구성 종목(Holdings) ────────────────────────────────────
 
 const holdingsMap: Record<string, Holding[]> = {
   "069500": [

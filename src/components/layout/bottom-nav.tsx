@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 const bottomNavItems = [
   { href: "/", label: "홈", icon: Home },
-  { href: "/explore", label: "ETF 탐색", icon: Search },
+  { href: "/explore", label: "종목 탐색", icon: Search },
   { href: "/portfolio", label: "포트폴리오", icon: Briefcase },
 ];
 

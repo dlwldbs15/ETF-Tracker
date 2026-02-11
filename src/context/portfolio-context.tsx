@@ -8,7 +8,7 @@ import {
   useMemo,
 } from "react";
 import { PortfolioItem } from "@/types/etf";
-import { mockEtfs, generatePriceHistory } from "@/lib/mock-data";
+import { mockAssets, generatePriceHistory } from "@/lib/mock-data";
 
 interface PortfolioContextValue {
   items: PortfolioItem[];
@@ -62,9 +62,9 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const amountMap = useMemo(() => {
     const map = new Map<string, number>();
     for (const item of items) {
-      const etf = mockEtfs.find((e) => e.ticker === item.ticker);
-      if (!etf) continue;
-      map.set(item.ticker, etf.price * item.quantity);
+      const asset = mockAssets.find((a) => a.ticker === item.ticker);
+      if (!asset) continue;
+      map.set(item.ticker, asset.currentPrice * item.quantity);
     }
     return map;
   }, [items]);
@@ -100,8 +100,8 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       const amount = amountMap.get(item.ticker) ?? 0;
       if (amount <= 0) continue;
 
-      const etf = mockEtfs.find((e) => e.ticker === item.ticker);
-      if (!etf) continue;
+      const asset = mockAssets.find((a) => a.ticker === item.ticker);
+      if (!asset) continue;
 
       const history = generatePriceHistory(item.ticker);
       if (history.length < 2) continue;
@@ -113,7 +113,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
 
       rate1w += ((lastPrice - weekAgoPrice) / weekAgoPrice) * 100 * pct;
       rate1m += ((lastPrice - firstPrice) / firstPrice) * 100 * pct;
-      weightedExpense += etf.expenseRatio * pct;
+      weightedExpense += (asset.type === "ETF" ? asset.expenseRatio : 0) * pct;
     }
 
     return { rate1w, rate1m, weightedExpense };

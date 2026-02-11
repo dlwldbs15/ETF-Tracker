@@ -6,7 +6,7 @@ import { Header } from "@/components/layout/header";
 import { EtfRankingTable } from "@/components/etf-ranking-table";
 import { FilterChips } from "@/components/filter-chips";
 import { useShell } from "@/components/layout/shell";
-import { mockEtfs, providers } from "@/lib/mock-data";
+import { mockEtfs, issuers } from "@/lib/mock-data";
 
 const dividendCycles = ["월배당", "분기배당", "연배당"];
 
@@ -26,7 +26,7 @@ export default function Home() {
         etf.name.toLowerCase().includes(query);
 
       const matchesProvider =
-        selectedProvider === null || etf.provider === selectedProvider;
+        selectedProvider === null || etf.issuer === selectedProvider;
 
       const matchesDividend =
         selectedDividend === null || etf.dividendCycle === selectedDividend;
@@ -39,7 +39,7 @@ export default function Home() {
     <>
       <Header
         title="대시보드"
-        description="ETF 시장 현황을 한눈에 확인하세요"
+        description="시장 현황을 한눈에 확인하세요"
         onMenuClick={openSidebar}
       />
       <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
@@ -56,7 +56,7 @@ export default function Home() {
           <div className="sticky top-0 z-10 rounded-t-lg border-b border-border bg-card p-4 sm:p-5">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-base font-semibold text-foreground">
-                ETF 수익률 순위
+                종목 수익률 순위
               </h2>
 
               {/* Search Input */}
@@ -77,7 +77,7 @@ export default function Home() {
               <div className="-mx-4 flex items-center gap-2.5 overflow-x-auto px-4 sm:-mx-0 sm:px-0">
                 <span className="w-10 shrink-0 text-[11px] font-medium text-muted-foreground">운용사</span>
                 <FilterChips
-                  options={providers}
+                  options={issuers}
                   selected={selectedProvider}
                   onSelect={setSelectedProvider}
                 />

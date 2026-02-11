@@ -15,8 +15,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "ETF Tracker",
-  description: "ETF 대시보드 - 실시간 ETF 순위 및 포트폴리오 관리",
+  title: "InvestBoard",
+  description: "ETF & 주식 통합 대시보드 - 실시간 순위 및 포트폴리오 관리",
 };
 
 export default function RootLayout({

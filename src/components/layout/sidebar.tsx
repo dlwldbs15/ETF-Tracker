@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 export const navItems = [
   { href: "/", label: "홈", icon: Home },
-  { href: "/explore", label: "ETF 탐색", icon: Search },
+  { href: "/explore", label: "종목 탐색", icon: Search },
   { href: "/portfolio", label: "내 포트폴리오", icon: Briefcase },
   { href: "/dividend-calendar", label: "배당 캘린더", icon: CalendarDays },
 ];
@@ -22,7 +22,7 @@ export function Sidebar() {
       <div className="flex h-14 items-center border-b border-border px-5">
         <div className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-[hsl(var(--sidebar-active))]" />
-          <span className="text-lg font-bold text-foreground">ETF Tracker</span>
+          <span className="text-lg font-bold text-foreground">InvestBoard</span>
         </div>
       </div>
 
@@ -50,7 +50,7 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="border-t border-border p-4">
-        <p className="text-xs text-muted-foreground">ETF Tracker v1.0</p>
+        <p className="text-xs text-muted-foreground">InvestBoard v1.0</p>
       </div>
     </aside>
   );
@@ -86,7 +86,7 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
         <div className="flex h-14 items-center justify-between border-b border-border px-5">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-[hsl(var(--sidebar-active))]" />
-            <span className="text-lg font-bold text-foreground">ETF Tracker</span>
+            <span className="text-lg font-bold text-foreground">InvestBoard</span>
           </div>
           <button
             onClick={onClose}
@@ -120,7 +120,7 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
         </nav>
 
         <div className="border-t border-border p-4">
-          <p className="text-xs text-muted-foreground">ETF Tracker v1.0</p>
+          <p className="text-xs text-muted-foreground">InvestBoard v1.0</p>
         </div>
       </aside>
     </>

@@ -37,8 +37,9 @@ import { Badge } from "@/components/ui/badge";
 import { PriceLineChart } from "@/components/chart/price-line-chart";
 import { useShell } from "@/components/layout/shell";
 import { usePortfolio } from "@/context/portfolio-context";
-import { getEtfDetail, generatePriceHistory, getHoldings } from "@/lib/mock-data";
-import { Holding, EtfDetail } from "@/types/etf";
+import { getAssetDetail, generatePriceHistory, getHoldings } from "@/lib/mock-data";
+import type { AssetDetail, EtfAssetDetail, StockAssetDetail } from "@/types/asset";
+import type { Holding } from "@/types/etf";
 import {
   formatKRW,
   formatMarketCap,
@@ -53,7 +54,7 @@ export default function EtfDetailPage() {
   const router = useRouter();
   const { openSidebar } = useShell();
 
-  const etf = getEtfDetail(params.ticker);
+  const etf = getAssetDetail(params.ticker);
 
   if (!etf) {
     return (
@@ -109,16 +110,24 @@ export default function EtfDetailPage() {
                 <h1 className="truncate text-xl font-bold text-foreground sm:text-2xl">
                   {etf.name}
                 </h1>
+                <span className={cn(
+                  "rounded px-1.5 py-0.5 text-xs font-semibold",
+                  etf.type === "ETF"
+                    ? "bg-blue-500/15 text-blue-400"
+                    : "bg-emerald-500/15 text-emerald-400"
+                )}>
+                  {etf.type === "ETF" ? "ETF" : "주식"}
+                </span>
                 <Badge variant="secondary">{etf.category}</Badge>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                {etf.ticker} · {etf.provider}
+                {etf.ticker}{etf.type === "ETF" ? ` · ${etf.issuer}` : etf.type === "STOCK" ? ` · ${etf.sector}` : ""}
               </p>
             </div>
 
             <div className="sm:text-right">
               <p className="text-2xl font-bold text-foreground sm:text-3xl">
-                {formatKRW(etf.price)}
+                {formatKRW(etf.currentPrice)}
               </p>
               <p
                 className={`mt-1 inline-flex items-center gap-1 text-sm font-semibold ${
@@ -157,31 +166,49 @@ export default function EtfDetailPage() {
                   label="시가총액"
                   value={formatMarketCap(etf.marketCap)}
                 />
-                <InfoCard
-                  icon={<TrendingUp className="h-4 w-4" />}
-                  label="기초지수"
-                  value={etf.benchmark}
-                />
+                {etf.type === "ETF" && (
+                  <InfoCard
+                    icon={<TrendingUp className="h-4 w-4" />}
+                    label="기초지수"
+                    value={etf.benchmark}
+                  />
+                )}
                 <InfoCard
                   icon={<Calendar className="h-4 w-4" />}
                   label="상장일"
                   value={etf.listingDate}
                 />
-                <InfoCard
-                  icon={<Percent className="h-4 w-4" />}
-                  label="총보수"
-                  value={formatExpenseRatio(etf.expenseRatio)}
-                />
+                {etf.type === "ETF" ? (
+                  <InfoCard
+                    icon={<Percent className="h-4 w-4" />}
+                    label="총보수"
+                    value={formatExpenseRatio(etf.expenseRatio)}
+                  />
+                ) : (
+                  <InfoCard
+                    icon={<Percent className="h-4 w-4" />}
+                    label="PER"
+                    value={`${etf.per.toFixed(1)}배`}
+                  />
+                )}
                 <InfoCard
                   icon={<BarChart3 className="h-4 w-4" />}
                   label="거래량"
                   value={formatVolume(etf.volume)}
                 />
-                <InfoCard
-                  icon={<Building2 className="h-4 w-4" />}
-                  label="운용사"
-                  value={etf.provider}
-                />
+                {etf.type === "ETF" ? (
+                  <InfoCard
+                    icon={<Building2 className="h-4 w-4" />}
+                    label="운용사"
+                    value={etf.issuer}
+                  />
+                ) : (
+                  <InfoCard
+                    icon={<Building2 className="h-4 w-4" />}
+                    label="PBR"
+                    value={`${etf.pbr.toFixed(2)}배`}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -192,11 +219,18 @@ export default function EtfDetailPage() {
           </div>
         </div>
 
-        {/* Dividend Section */}
-        <DividendSection etf={etf} />
+        {/* ETF 전용: 배당 + 분석기 */}
+        {etf.type === "ETF" && (
+          <>
+            <DividendSection etf={etf} />
+            <IntegratedAnalyzer etf={etf} />
+          </>
+        )}
 
-        {/* 장기 비용/수익 통합 분석기 */}
-        <IntegratedAnalyzer etf={etf} />
+        {/* 주식 전용: 주요 재무 지표 */}
+        {etf.type === "STOCK" && (
+          <StockFinancialSection stock={etf} />
+        )}
       </div>
     </div>
   );
@@ -204,12 +238,12 @@ export default function EtfDetailPage() {
 
 // ─── 예상 배당 정보 섹션 ─────────────────────────────────
 
-function DividendSection({ etf }: { etf: EtfDetail }) {
+function DividendSection({ etf }: { etf: EtfAssetDetail }) {
   const { items } = usePortfolio();
   const portfolioItem = items.find((i) => i.ticker === etf.ticker);
   const quantity = portfolioItem?.quantity ?? 0;
 
-  const totalInvestment = etf.price * quantity;
+  const totalInvestment = etf.currentPrice * quantity;
   const annualDividend = totalInvestment * (etf.dividendYield / 100);
   const annualExpense = totalInvestment * (etf.expenseRatio / 100);
   const isMonthly = etf.dividendCycle === "월배당";
@@ -338,7 +372,7 @@ function DividendSection({ etf }: { etf: EtfDetail }) {
           ) : (
             <div className="rounded-lg border border-dashed border-border p-4 text-center">
               <p className="text-xs text-muted-foreground">
-                포트폴리오에 이 ETF를 담고 수량을 입력하면
+                포트폴리오에 이 종목을 담고 수량을 입력하면
               </p>
               <p className="text-xs text-muted-foreground">
                 예상 배당금을 확인할 수 있습니다
@@ -364,7 +398,7 @@ interface SimPoint {
   realNet: number;
 }
 
-function IntegratedAnalyzer({ etf }: { etf: EtfDetail }) {
+function IntegratedAnalyzer({ etf }: { etf: EtfAssetDetail }) {
   const { items } = usePortfolio();
   const portfolioItem = items.find((i) => i.ticker === etf.ticker);
   const quantity = portfolioItem?.quantity ?? 0;
@@ -372,7 +406,7 @@ function IntegratedAnalyzer({ etf }: { etf: EtfDetail }) {
   const hasDividend = etf.dividendYield > 0;
   if (!hasDividend) return null;
 
-  const totalInvestment = etf.price * quantity;
+  const totalInvestment = etf.currentPrice * quantity;
   const divRate = etf.dividendYield / 100;
   const expRate = etf.expenseRatio / 100;
 
@@ -735,6 +769,480 @@ function HoldingsList({ holdings }: { holdings: Holding[] }) {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── 주식 주요 재무 지표 섹션 ─────────────────────────────
+
+function StockFinancialSection({ stock }: { stock: StockAssetDetail }) {
+  const operatingMargin = stock.revenue > 0 ? (stock.operatingProfit / stock.revenue) * 100 : 0;
+  const netMargin = stock.revenue > 0 ? (stock.netIncome / stock.revenue) * 100 : 0;
+
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      {/* ── 기업 개요 ────────────────────────────────── */}
+      <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+        <div className="mb-4 flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15">
+            <Building2 className="h-4 w-4 text-emerald-400" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">기업 개요</h2>
+            <span className="text-[11px] text-muted-foreground">{stock.sector} 섹터</span>
+          </div>
+        </div>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {stock.description}
+        </p>
+        <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
+          <span>상장일 {stock.listingDate}</span>
+          <span>·</span>
+          <span>임직원 {stock.employees.toLocaleString("ko-KR")}명</span>
+        </div>
+      </div>
+
+      {/* ── 핵심 지표 2x2 그리드 ─────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        {/* PER */}
+        <div className="group relative overflow-hidden rounded-xl border border-violet-500/20 bg-card p-4 sm:p-5">
+          <div className="absolute -right-3 -top-3 h-16 w-16 rounded-full bg-violet-500/5" />
+          <div className="relative">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/15">
+              <BarChart3 className="h-4.5 w-4.5 text-violet-400" />
+            </div>
+            <p className="text-xs font-medium text-muted-foreground">PER</p>
+            <p className="mt-1 text-xl font-bold text-foreground sm:text-2xl">
+              {stock.per.toFixed(1)}
+              <span className="ml-0.5 text-sm font-medium text-muted-foreground">배</span>
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {stock.per < 10 ? "저평가 구간" : stock.per < 20 ? "적정 수준" : "성장주 프리미엄"}
+            </p>
+          </div>
+        </div>
+
+        {/* PBR */}
+        <div className="group relative overflow-hidden rounded-xl border border-blue-500/20 bg-card p-4 sm:p-5">
+          <div className="absolute -right-3 -top-3 h-16 w-16 rounded-full bg-blue-500/5" />
+          <div className="relative">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/15">
+              <TrendingUp className="h-4.5 w-4.5 text-blue-400" />
+            </div>
+            <p className="text-xs font-medium text-muted-foreground">PBR</p>
+            <p className="mt-1 text-xl font-bold text-foreground sm:text-2xl">
+              {stock.pbr.toFixed(2)}
+              <span className="ml-0.5 text-sm font-medium text-muted-foreground">배</span>
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {stock.pbr < 1 ? "순자산 이하 거래" : stock.pbr < 2 ? "적정 수준" : "프리미엄 거래"}
+            </p>
+          </div>
+        </div>
+
+        {/* 배당수익률 */}
+        <div className="group relative overflow-hidden rounded-xl border border-amber-500/20 bg-card p-4 sm:p-5">
+          <div className="absolute -right-3 -top-3 h-16 w-16 rounded-full bg-amber-500/5" />
+          <div className="relative">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/15">
+              <Coins className="h-4.5 w-4.5 text-amber-400" />
+            </div>
+            <p className="text-xs font-medium text-muted-foreground">배당수익률</p>
+            <p className={cn(
+              "mt-1 text-xl font-bold sm:text-2xl",
+              stock.dividendYield > 0 ? "text-amber-400" : "text-muted-foreground"
+            )}>
+              {stock.dividendYield > 0 ? (
+                <>
+                  {stock.dividendYield.toFixed(2)}
+                  <span className="ml-0.5 text-sm font-medium">%</span>
+                </>
+              ) : "-"}
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {stock.dividendYield >= 3 ? "고배당주" : stock.dividendYield >= 1 ? "배당 지급" : "배당 미미"}
+            </p>
+          </div>
+        </div>
+
+        {/* 시가총액 */}
+        <div className="group relative overflow-hidden rounded-xl border border-emerald-500/20 bg-card p-4 sm:p-5">
+          <div className="absolute -right-3 -top-3 h-16 w-16 rounded-full bg-emerald-500/5" />
+          <div className="relative">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/15">
+              <DollarSign className="h-4.5 w-4.5 text-emerald-400" />
+            </div>
+            <p className="text-xs font-medium text-muted-foreground">시가총액</p>
+            <p className="mt-1 text-xl font-bold text-foreground sm:text-2xl">
+              {formatMarketCap(stock.marketCap)}
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {stock.marketCap >= 100_0000_0000_0000 ? "초대형주" : stock.marketCap >= 10_0000_0000_0000 ? "대형주" : "중형주"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 손익 현황 ────────────────────────────────── */}
+      <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+        <div className="mb-4 flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/15">
+            <BarChart3 className="h-4 w-4 text-blue-400" />
+          </div>
+          <h2 className="text-sm font-semibold text-foreground">손익 현황</h2>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border border-border bg-secondary/30 p-3.5">
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <DollarSign className="h-3.5 w-3.5" />
+              <span className="text-xs">매출액</span>
+            </div>
+            <p className="mt-2 font-mono text-base font-bold text-foreground sm:text-lg">
+              {formatMarketCap(stock.revenue)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-emerald-500/15 bg-emerald-500/5 p-3.5">
+            <div className="flex items-center gap-1.5 text-emerald-400/80">
+              <TrendingUp className="h-3.5 w-3.5" />
+              <span className="text-xs">영업이익</span>
+            </div>
+            <p className="mt-2 font-mono text-base font-bold text-emerald-400 sm:text-lg">
+              {formatMarketCap(stock.operatingProfit)}
+            </p>
+            <p className="mt-0.5 text-[11px] text-emerald-400/70">
+              마진 {operatingMargin.toFixed(1)}%
+            </p>
+          </div>
+          <div className="rounded-lg border border-blue-500/15 bg-blue-500/5 p-3.5">
+            <div className="flex items-center gap-1.5 text-blue-400/80">
+              <Percent className="h-3.5 w-3.5" />
+              <span className="text-xs">순이익</span>
+            </div>
+            <p className="mt-2 font-mono text-base font-bold text-blue-400 sm:text-lg">
+              {formatMarketCap(stock.netIncome)}
+            </p>
+            <p className="mt-0.5 text-[11px] text-blue-400/70">
+              마진 {netMargin.toFixed(1)}%
+            </p>
+          </div>
+        </div>
+
+        {/* 수익성 인사이트 */}
+        {stock.revenue > 0 && (
+          <div className="mt-3 rounded-lg border border-violet-400/20 bg-violet-400/5 p-3">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-violet-400" />
+              <p className="text-sm leading-relaxed text-foreground">
+                영업이익률{" "}
+                <span className="font-bold text-emerald-400">
+                  {operatingMargin.toFixed(1)}%
+                </span>
+                , 순이익률{" "}
+                <span className="font-bold text-blue-400">
+                  {netMargin.toFixed(1)}%
+                </span>
+                {operatingMargin >= 15
+                  ? " — 우수한 수익 구조를 보유하고 있습니다."
+                  : operatingMargin >= 5
+                    ? " — 안정적인 수익 구조입니다."
+                    : " — 수익성 개선 여지가 있습니다."}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── 배당 시뮬레이션 (배당이 있는 주식만) ──────── */}
+      {stock.dividendYield > 0 && (
+        <StockDividendSimulator stock={stock} />
+      )}
+    </div>
+  );
+}
+
+// ─── 주식 세후 배당 재투자 시뮬레이터 ────────────────────
+
+const STOCK_YEARS_RANGE = Array.from({ length: 20 }, (_, i) => i + 1);
+const STOCK_MILESTONES = [1, 3, 5, 10, 20] as const;
+const STOCK_DIVIDEND_TAX = 0.154; // 배당소득세 15.4%
+
+interface StockSimPoint {
+  year: number;
+  simple: number;
+  reinvestPre: number;
+  reinvestPost: number;
+}
+
+function StockDividendSimulator({ stock }: { stock: StockAssetDetail }) {
+  const { items } = usePortfolio();
+  const portfolioItem = items.find((i) => i.ticker === stock.ticker);
+  const quantity = portfolioItem?.quantity ?? 0;
+
+  const totalInvestment = stock.currentPrice * quantity;
+  const divRate = stock.dividendYield / 100;
+  const hasQuantity = quantity > 0;
+
+  const chartData: StockSimPoint[] = useMemo(() => {
+    const base = hasQuantity ? totalInvestment : 100;
+
+    return STOCK_YEARS_RANGE.map((year) => {
+      // 단순 투자 (배당 수령, 재투자 X)
+      const simple = base * (1 + divRate * year);
+
+      // 배당 재투자 (세전, 연복리)
+      const reinvestPre = base * Math.pow(1 + divRate, year);
+
+      // 배당 재투자 (세후 15.4% 차감)
+      const afterTaxDivRate = divRate * (1 - STOCK_DIVIDEND_TAX);
+      const reinvestPost = base * Math.pow(1 + afterTaxDivRate, year);
+
+      return {
+        year,
+        simple: Math.round(simple),
+        reinvestPre: Math.round(reinvestPre),
+        reinvestPost: Math.round(reinvestPost),
+      };
+    });
+  }, [totalInvestment, hasQuantity, divRate]);
+
+  const milestoneData = useMemo(() => {
+    return STOCK_MILESTONES.map((year) => {
+      const point = chartData[year - 1];
+      const base = hasQuantity ? totalInvestment : 100;
+      return {
+        ...point,
+        taxCost: point.reinvestPre - point.reinvestPost,
+        reinvestGain: point.reinvestPost - point.simple,
+        yieldPct: ((point.reinvestPost - base) / base * 100),
+      };
+    });
+  }, [chartData, hasQuantity, totalInvestment]);
+
+  // 10년 기준 인사이트
+  const tenYear = milestoneData.find((m) => m.year === 10)!;
+  const base = hasQuantity ? totalInvestment : 100;
+  const totalReturn10y = ((tenYear.reinvestPost - base) / base * 100);
+  const taxLoss10y = tenYear.reinvestPre - tenYear.reinvestPost;
+
+  // 연간 세후 배당금
+  const annualDivAfterTax = hasQuantity
+    ? totalInvestment * divRate * (1 - STOCK_DIVIDEND_TAX)
+    : 0;
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+      <div className="mb-4 flex items-center gap-2.5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15">
+          <RefreshCw className="h-4 w-4 text-amber-400" />
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">
+            세후 배당 재투자 시뮬레이션
+          </h2>
+          <span className="text-[11px] text-muted-foreground">
+            배당소득세 15.4% 적용
+          </span>
+        </div>
+      </div>
+
+      {/* 배당 요약 카드 */}
+      {hasQuantity && (
+        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border border-amber-500/15 bg-amber-500/5 p-3">
+            <p className="text-[11px] text-muted-foreground">연간 배당 (세전)</p>
+            <p className="mt-1 font-mono text-sm font-bold text-foreground">
+              {formatKRW(Math.round(totalInvestment * divRate))}
+            </p>
+          </div>
+          <div className="rounded-lg border border-emerald-500/15 bg-emerald-500/5 p-3">
+            <p className="text-[11px] text-muted-foreground">연간 배당 (세후)</p>
+            <p className="mt-1 font-mono text-sm font-bold text-emerald-400">
+              {formatKRW(Math.round(annualDivAfterTax))}
+            </p>
+          </div>
+          <div className="rounded-lg border border-red-500/15 bg-red-500/5 p-3 col-span-2 sm:col-span-1">
+            <p className="text-[11px] text-muted-foreground">연간 배당소득세</p>
+            <p className="mt-1 font-mono text-sm font-bold text-red-400">
+              -{formatKRW(Math.round(totalInvestment * divRate * STOCK_DIVIDEND_TAX))}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 비교 차트 */}
+      <div className="mb-5">
+        <h3 className="mb-3 text-xs font-medium text-muted-foreground">
+          20년 자산 가치 비교 {!hasQuantity && "(100 기준)"}
+        </h3>
+        <div className="h-[240px] w-full sm:h-[300px]">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+            <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(217 33% 17%)" vertical={false} />
+              <XAxis
+                dataKey="year"
+                tick={{ fontSize: 10, fill: "hsl(215 20% 55%)" }}
+                axisLine={{ stroke: "hsl(217 33% 17%)" }}
+                tickLine={false}
+                tickFormatter={(v: number) => `${v}년`}
+                interval={3}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: "hsl(215 20% 55%)" }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v: number) =>
+                  hasQuantity
+                    ? v >= 10000 ? `${Math.round(v / 10000)}만` : v.toLocaleString("ko-KR")
+                    : `${v}`
+                }
+                width={52}
+              />
+              <RechartsTooltip content={<StockSimTooltip hasQuantity={hasQuantity} />} />
+              <Legend
+                verticalAlign="top"
+                height={30}
+                formatter={(value: string) => (
+                  <span style={{ fontSize: 11, color: "hsl(215 20% 65%)" }}>{value}</span>
+                )}
+              />
+              <Line
+                type="monotone"
+                dataKey="simple"
+                name="단순 투자"
+                stroke="hsl(215 20% 55%)"
+                strokeWidth={1.5}
+                strokeDasharray="5 5"
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="reinvestPre"
+                name="재투자 (세전)"
+                stroke="#34d399"
+                strokeWidth={2}
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="reinvestPost"
+                name="재투자 (세후)"
+                stroke="#fbbf24"
+                strokeWidth={2}
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* 마일스톤 테이블 */}
+      <div className="mb-5 overflow-x-auto">
+        <table className="w-full text-xs sm:text-sm">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="pb-2 text-left font-medium text-muted-foreground">기간</th>
+              <th className="pb-2 text-right font-medium text-muted-foreground">단순 투자</th>
+              <th className="pb-2 text-right font-medium text-emerald-400/70">세전 재투자</th>
+              <th className="pb-2 text-right font-medium text-amber-400/70">세후 재투자</th>
+              <th className="pb-2 text-right font-medium text-red-400/70">세금 누적</th>
+            </tr>
+          </thead>
+          <tbody>
+            {milestoneData.map((row) => (
+              <tr key={row.year} className="border-b border-border/50 last:border-b-0">
+                <td className="py-2.5 font-medium text-foreground">{row.year}년</td>
+                <td className="py-2.5 text-right font-mono text-muted-foreground">
+                  {hasQuantity ? formatKRW(row.simple) : row.simple}
+                </td>
+                <td className="py-2.5 text-right font-mono font-semibold text-emerald-400">
+                  {hasQuantity ? formatKRW(row.reinvestPre) : row.reinvestPre}
+                </td>
+                <td className="py-2.5 text-right font-mono font-semibold text-amber-400">
+                  {hasQuantity ? formatKRW(row.reinvestPost) : row.reinvestPost}
+                </td>
+                <td className="py-2.5 text-right font-mono text-red-400">
+                  -{hasQuantity ? formatKRW(row.taxCost) : row.taxCost}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 인사이트 */}
+      <div className="space-y-2.5">
+        {/* 세후 수익률 */}
+        <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 p-3">
+          <div className="flex items-start gap-2">
+            <Coins className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+            <p className="text-sm leading-relaxed text-foreground">
+              <span className="font-semibold text-amber-400">10년</span> 세후 배당 재투자 시
+              총 수익률{" "}
+              <span className="font-bold text-amber-400">
+                +{totalReturn10y.toFixed(1)}%
+              </span>
+              , 배당소득세로 인해{" "}
+              <span className="font-bold text-red-400">
+                {hasQuantity ? formatKRW(taxLoss10y) : `${((taxLoss10y / base) * 100).toFixed(1)}%`}
+              </span>
+              의 차이가 발생합니다.
+            </p>
+          </div>
+        </div>
+
+        {/* ISA 절세 팁 */}
+        <div className="rounded-lg border border-blue-400/20 bg-blue-400/5 p-3">
+          <div className="flex items-start gap-2">
+            <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
+            <p className="text-sm leading-relaxed text-foreground">
+              <span className="font-semibold text-blue-400">ISA 계좌</span>를 활용하면
+              배당소득세 15.4%를 절약할 수 있습니다.
+              {hasQuantity && (
+                <>
+                  {" "}10년간 절세 효과: 약{" "}
+                  <span className="font-semibold text-blue-400">
+                    {formatKRW(taxLoss10y)}
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
+        * 배당수익률 {stock.dividendYield.toFixed(2)}% 고정 가정. 주가 변동 미반영, 연 1회 복리 기준 단순 시뮬레이션입니다.
+        ISA 비과세 한도(200~400만 원/연)는 별도 확인이 필요합니다.
+      </p>
+    </div>
+  );
+}
+
+function StockSimTooltip({
+  active,
+  payload,
+  label,
+  hasQuantity,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string }>;
+  label?: number;
+  hasQuantity: boolean;
+}) {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <div className="rounded-lg border border-border bg-card/95 px-3.5 py-2.5 shadow-xl backdrop-blur-sm">
+      <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">{label}년 후</p>
+      {payload.map((entry) => (
+        <div key={entry.name} className="flex items-center justify-between gap-4">
+          <span className="text-[11px]" style={{ color: entry.color }}>{entry.name}</span>
+          <span className="font-mono text-xs font-semibold text-foreground">
+            {hasQuantity ? formatKRW(entry.value) : entry.value}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

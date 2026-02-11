@@ -74,7 +74,7 @@ export default function DividendCalendarPage() {
       const months = getDividendMonths(etf.dividendCycle);
       if (months.length === 0) continue;
 
-      const investAmount = etf.price * etf.quantity;
+      const investAmount = etf.currentPrice * etf.quantity;
       const annualDividend = investAmount * (etf.dividendYield / 100);
       const perPayment = annualDividend / months.length;
 
@@ -106,7 +106,7 @@ export default function DividendCalendarPage() {
       })
       .map((etf) => {
         const months = getDividendMonths(etf.dividendCycle);
-        const investAmount = etf.price * etf.quantity;
+        const investAmount = etf.currentPrice * etf.quantity;
         const annualDividend = investAmount * (etf.dividendYield / 100);
         const perPayment = annualDividend / months.length;
         return {
@@ -158,11 +158,11 @@ export default function DividendCalendarPage() {
           </h2>
           {!hasPortfolio ? (
             <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-              포트폴리오에 ETF를 담아주세요
+              포트폴리오에 종목을 담아주세요
             </div>
           ) : !hasDividendEtfs ? (
             <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-              배당이 있는 ETF가 포트폴리오에 없습니다
+              배당이 있는 종목이 포트폴리오에 없습니다
             </div>
           ) : (
             <div className="h-[240px] w-full sm:h-[320px]">
@@ -227,8 +227,8 @@ export default function DividendCalendarPage() {
           {thisMonthEtfs.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
               {!hasPortfolio
-                ? "포트폴리오에 ETF를 담아주세요"
-                : "이번 달 배당 예정인 ETF가 없습니다"}
+                ? "포트폴리오에 종목을 담아주세요"
+                : "이번 달 배당 예정인 종목이 없습니다"}
             </p>
           ) : (
             <div className="space-y-2">

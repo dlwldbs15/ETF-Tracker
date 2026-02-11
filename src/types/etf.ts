@@ -1,22 +1,4 @@
-export interface Etf {
-  ticker: string;
-  name: string;
-  provider: string;
-  price: number;
-  changeRate: number;
-  marketCap: number;
-  expenseRatio: number;
-  category: string;
-  volume: number;
-  dividendYield: number;
-  dividendCycle: string;
-  lastDividendAmount: number;
-}
-
-export interface EtfDetail extends Etf {
-  benchmark: string;
-  listingDate: string;
-}
+export type { EtfAsset as Etf, EtfAssetDetail as EtfDetail, Asset, AssetType } from "./asset";
 
 export interface PricePoint {
   date: string;

@@ -38,7 +38,7 @@ import { PriceLineChart } from "@/components/chart/price-line-chart";
 import { useShell } from "@/components/layout/shell";
 import { usePortfolio } from "@/context/portfolio-context";
 import { getAssetDetail, generatePriceHistory, getHoldings } from "@/lib/mock-data";
-import type { AssetDetail, EtfAssetDetail, StockAssetDetail } from "@/types/asset";
+import type { EtfAssetDetail, StockAssetDetail } from "@/types/asset";
 import type { Holding } from "@/types/etf";
 import {
   formatKRW,
@@ -404,7 +404,6 @@ function IntegratedAnalyzer({ etf }: { etf: EtfAssetDetail }) {
   const quantity = portfolioItem?.quantity ?? 0;
 
   const hasDividend = etf.dividendYield > 0;
-  if (!hasDividend) return null;
 
   const totalInvestment = etf.currentPrice * quantity;
   const divRate = etf.dividendYield / 100;
@@ -456,6 +455,8 @@ function IntegratedAnalyzer({ etf }: { etf: EtfAssetDetail }) {
       };
     });
   }, [chartData]);
+
+  if (!hasDividend) return null;
 
   // 인사이트 계산 (10년 기준)
   const tenYear = milestoneData.find((m) => m.year === 10)!;

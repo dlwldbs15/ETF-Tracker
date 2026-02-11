@@ -1,22 +1,19 @@
 "use client";
 
 import { useMemo } from "react";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Cell,
-} from "recharts";
-import { CalendarDays, Coins, TrendingUp } from "lucide-react";
+import { CalendarDays, Coins, TrendingUp, Sparkles } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { useShell } from "@/components/layout/shell";
 import { usePortfolio } from "@/context/portfolio-context";
-import { mockEtfs } from "@/lib/mock-data";
+import { mockAssets } from "@/lib/mock-data";
 import { formatKRW } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/card";
 
 const MONTH_LABELS = [
   "1월", "2월", "3월", "4월", "5월", "6월",
@@ -24,102 +21,95 @@ const MONTH_LABELS = [
 ];
 
 /** 배당 주기에 따라 배당이 발생하는 월(0-indexed) 목록을 반환 */
-function getDividendMonths(cycle: string): number[] {
+function getDividendMonths(cycle: string, type: "ETF" | "STOCK"): number[] {
   switch (cycle) {
     case "월배당":
       return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
     case "분기배당":
       return [2, 5, 8, 11]; // 3, 6, 9, 12월
     case "연배당":
-      return [11]; // 12월
+      return type === "STOCK" ? [3] : [11]; // 주식 4월, ETF 12월
     default:
       return [];
   }
 }
 
-interface MonthlyData {
-  month: string;
-  amount: number;
-  monthIndex: number;
-}
-
-interface DividendEtfEntry {
+interface MonthEntry {
   ticker: string;
   name: string;
   amount: number;
+  type: "ETF" | "STOCK";
+}
+
+interface MonthData {
+  monthIndex: number;
+  label: string;
+  total: number;
+  entries: MonthEntry[];
 }
 
 export default function DividendCalendarPage() {
   const { openSidebar } = useShell();
   const { items } = usePortfolio();
 
-  const currentMonth = new Date().getMonth(); // 0-indexed
+  const currentMonth = new Date().getMonth();
 
-  // 포트폴리오에 담긴 ETF 중 배당이 있는 것만
-  const portfolioEtfs = useMemo(() => {
+  // 포트폴리오에 담긴 종목 중 배당이 있는 것만
+  const portfolioAssets = useMemo(() => {
     return items
       .map((item) => {
-        const etf = mockEtfs.find((e) => e.ticker === item.ticker);
-        if (!etf || etf.dividendCycle === "미지급" || etf.dividendYield === 0) return null;
-        return { ...etf, quantity: item.quantity };
+        const asset = mockAssets.find((a) => a.ticker === item.ticker);
+        if (!asset || asset.dividendYield === 0) return null;
+        if (asset.type === "ETF" && asset.dividendCycle === "미지급") return null;
+        return { ...asset, quantity: item.quantity };
       })
-      .filter(Boolean) as (typeof mockEtfs[number] & { quantity: number })[];
+      .filter(Boolean) as (typeof mockAssets[number] & { quantity: number })[];
   }, [items]);
 
-  // 월별 배당금 합산
-  const monthlyData: MonthlyData[] = useMemo(() => {
-    const totals = new Array(12).fill(0);
+  // 월별 배당 데이터
+  const monthlyGrid: MonthData[] = useMemo(() => {
+    const months: MonthData[] = MONTH_LABELS.map((label, i) => ({
+      monthIndex: i,
+      label,
+      total: 0,
+      entries: [],
+    }));
 
-    for (const etf of portfolioEtfs) {
-      const months = getDividendMonths(etf.dividendCycle);
-      if (months.length === 0) continue;
+    for (const asset of portfolioAssets) {
+      const cycle = asset.type === "ETF" ? asset.dividendCycle : "연배당";
+      const divMonths = getDividendMonths(cycle, asset.type);
+      if (divMonths.length === 0) continue;
 
-      const investAmount = etf.currentPrice * etf.quantity;
-      const annualDividend = investAmount * (etf.dividendYield / 100);
-      const perPayment = annualDividend / months.length;
+      const investAmount = asset.currentPrice * asset.quantity;
+      const annualDividend = investAmount * (asset.dividendYield / 100);
+      const perPayment = Math.round(annualDividend / divMonths.length);
 
-      for (const m of months) {
-        totals[m] += perPayment;
+      for (const m of divMonths) {
+        months[m].entries.push({
+          ticker: asset.ticker,
+          name: asset.name,
+          amount: perPayment,
+          type: asset.type,
+        });
+        months[m].total += perPayment;
       }
     }
 
-    return totals.map((amount, i) => ({
-      month: MONTH_LABELS[i],
-      amount: Math.round(amount),
-      monthIndex: i,
-    }));
-  }, [portfolioEtfs]);
+    return months;
+  }, [portfolioAssets]);
 
-  // 연간 총 배당금, 월평균
   const annualTotal = useMemo(
-    () => monthlyData.reduce((sum, d) => sum + d.amount, 0),
-    [monthlyData]
+    () => monthlyGrid.reduce((sum, m) => sum + m.total, 0),
+    [monthlyGrid]
   );
   const monthlyAverage = Math.round(annualTotal / 12);
-
-  // 이번 달 배당 ETF 목록
-  const thisMonthEtfs: DividendEtfEntry[] = useMemo(() => {
-    return portfolioEtfs
-      .filter((etf) => {
-        const months = getDividendMonths(etf.dividendCycle);
-        return months.includes(currentMonth);
-      })
-      .map((etf) => {
-        const months = getDividendMonths(etf.dividendCycle);
-        const investAmount = etf.currentPrice * etf.quantity;
-        const annualDividend = investAmount * (etf.dividendYield / 100);
-        const perPayment = annualDividend / months.length;
-        return {
-          ticker: etf.ticker,
-          name: etf.name,
-          amount: Math.round(perPayment),
-        };
-      })
-      .filter((e) => e.amount > 0);
-  }, [portfolioEtfs, currentMonth]);
+  const maxMonthTotal = useMemo(
+    () => Math.max(...monthlyGrid.map((m) => m.total)),
+    [monthlyGrid]
+  );
 
   const hasPortfolio = items.length > 0;
-  const hasDividendEtfs = portfolioEtfs.length > 0;
+  const hasDividendAssets = portfolioAssets.length > 0;
 
   return (
     <>
@@ -130,153 +120,179 @@ export default function DividendCalendarPage() {
       />
       <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
         {/* 상단 통계 카드 */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-          <div className="rounded-lg border border-border bg-card p-4">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Coins className="h-4 w-4" />
-              <span className="text-xs font-medium">연간 총 배당금</span>
-            </div>
-            <p className="mt-2 text-2xl font-bold text-foreground">
-              {formatKRW(annualTotal)}
-            </p>
-          </div>
-          <div className="rounded-lg border border-border bg-card p-4">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <TrendingUp className="h-4 w-4" />
-              <span className="text-xs font-medium">월평균 배당금</span>
-            </div>
-            <p className="mt-2 text-2xl font-bold text-foreground">
-              {formatKRW(monthlyAverage)}
-            </p>
-          </div>
-        </div>
-
-        {/* 바 차트 */}
-        <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
-          <h2 className="mb-4 text-base font-semibold text-foreground">
-            월별 예상 배당금
-          </h2>
-          {!hasPortfolio ? (
-            <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-              포트폴리오에 종목을 담아주세요
-            </div>
-          ) : !hasDividendEtfs ? (
-            <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-              배당이 있는 종목이 포트폴리오에 없습니다
-            </div>
-          ) : (
-            <div className="h-[240px] w-full sm:h-[320px]">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <BarChart
-                  data={monthlyData}
-                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="hsl(217 33% 17%)"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fontSize: 11, fill: "hsl(215 20% 55%)" }}
-                    axisLine={{ stroke: "hsl(217 33% 17%)" }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 10, fill: "hsl(215 20% 55%)" }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v: number) =>
-                      v >= 10000
-                        ? `${Math.round(v / 10000)}만`
-                        : v.toLocaleString("ko-KR")
-                    }
-                    width={52}
-                  />
-                  <Tooltip content={<ChartTooltip />} cursor={{ fill: "hsl(217 33% 17% / 0.3)" }} />
-                  <Bar dataKey="amount" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                    {monthlyData.map((entry) => (
-                      <Cell
-                        key={entry.month}
-                        fill={
-                          entry.monthIndex === currentMonth
-                            ? "hsl(45 93% 58%)"  // amber - 이번 달 강조
-                            : entry.amount > 0
-                              ? "hsl(160 60% 45%)" // emerald
-                              : "hsl(217 33% 20%)" // muted
-                        }
-                        fillOpacity={entry.monthIndex === currentMonth ? 1 : 0.8}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-
-        {/* 이번 달 배당 ETF */}
-        <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-amber-400" />
-            <h2 className="text-base font-semibold text-foreground">
-              {MONTH_LABELS[currentMonth]} 배당 예정
-            </h2>
-          </div>
-
-          {thisMonthEtfs.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              {!hasPortfolio
-                ? "포트폴리오에 종목을 담아주세요"
-                : "이번 달 배당 예정인 종목이 없습니다"}
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {thisMonthEtfs.map((etf) => (
-                <div
-                  key={etf.ticker}
-                  className="flex items-center justify-between rounded-md border border-border bg-secondary/30 px-4 py-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{etf.name}</p>
-                    <p className="text-xs text-muted-foreground">{etf.ticker}</p>
-                  </div>
-                  <p className="text-sm font-semibold text-amber-400">
-                    {formatKRW(etf.amount)}
-                  </p>
-                </div>
-              ))}
-              <div className="flex items-center justify-between border-t border-border pt-3">
-                <span className="text-sm font-medium text-muted-foreground">이번 달 합계</span>
-                <span className="text-sm font-bold text-foreground">
-                  {formatKRW(monthlyData[currentMonth].amount)}
-                </span>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <Card className="border-border">
+            <CardHeader className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Coins className="h-4 w-4" />
+                <span className="text-xs font-medium">연간 총 배당금</span>
               </div>
-            </div>
-          )}
+              <CardTitle className="mt-1 text-xl font-bold text-foreground sm:text-2xl">
+                {formatKRW(annualTotal)}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card className="border-border">
+            <CardHeader className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <TrendingUp className="h-4 w-4" />
+                <span className="text-xs font-medium">월평균 배당금</span>
+              </div>
+              <CardTitle className="mt-1 text-xl font-bold text-foreground sm:text-2xl">
+                {formatKRW(monthlyAverage)}
+              </CardTitle>
+            </CardHeader>
+          </Card>
         </div>
+
+        {/* 안내 메시지 (포트폴리오 없을 때) */}
+        {!hasPortfolio ? (
+          <Card className="border-dashed border-border">
+            <CardContent className="flex h-48 items-center justify-center p-6">
+              <p className="text-sm text-muted-foreground">
+                포트폴리오에 종목을 담고 수량을 입력하면 월별 배당금을 확인할 수 있습니다
+              </p>
+            </CardContent>
+          </Card>
+        ) : !hasDividendAssets ? (
+          <Card className="border-dashed border-border">
+            <CardContent className="flex h-48 items-center justify-center p-6">
+              <p className="text-sm text-muted-foreground">
+                배당이 있는 종목이 포트폴리오에 없습니다
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          /* 12개월 그리드 */
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+            {monthlyGrid.map((month) => {
+              const isCurrent = month.monthIndex === currentMonth;
+              const isBonus =
+                month.total > 0 && month.total === maxMonthTotal;
+              const hasEntries = month.entries.length > 0;
+
+              return (
+                <Card
+                  key={month.monthIndex}
+                  className={cn(
+                    "relative overflow-hidden transition-colors",
+                    isCurrent && "ring-1 ring-amber-400/50",
+                    isBonus && !isCurrent && "ring-1 ring-emerald-400/40",
+                    isBonus && "border-emerald-400/30 bg-emerald-400/[0.03]",
+                    !hasEntries && "opacity-50"
+                  )}
+                >
+                  {/* 보너스 달 뱃지 */}
+                  {isBonus && hasEntries && (
+                    <div className="absolute right-2.5 top-2.5">
+                      <div className="flex items-center gap-1 rounded-full bg-emerald-400/15 px-2 py-0.5">
+                        <Sparkles className="h-3 w-3 text-emerald-400" />
+                        <span className="text-[10px] font-semibold text-emerald-400">
+                          MAX
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 이번 달 뱃지 */}
+                  {isCurrent && !isBonus && (
+                    <div className="absolute right-2.5 top-2.5">
+                      <div className="flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5">
+                        <CalendarDays className="h-3 w-3 text-amber-400" />
+                        <span className="text-[10px] font-semibold text-amber-400">
+                          NOW
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <CardHeader className="p-4 pb-2">
+                    <div className="flex items-baseline justify-between pr-14">
+                      <CardTitle
+                        className={cn(
+                          "text-base font-bold",
+                          isCurrent
+                            ? "text-amber-400"
+                            : "text-foreground"
+                        )}
+                      >
+                        {month.label}
+                      </CardTitle>
+                    </div>
+                    <p
+                      className={cn(
+                        "mt-1 text-lg font-bold tabular-nums sm:text-xl",
+                        month.total > 0
+                          ? isBonus
+                            ? "text-emerald-400"
+                            : "text-foreground"
+                          : "text-muted-foreground/40"
+                      )}
+                    >
+                      {month.total > 0 ? formatKRW(month.total) : "-"}
+                    </p>
+
+                    {/* 비율 바 */}
+                    {maxMonthTotal > 0 && (
+                      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-secondary">
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-all",
+                            isBonus
+                              ? "bg-emerald-400"
+                              : isCurrent
+                                ? "bg-amber-400"
+                                : "bg-primary/60"
+                          )}
+                          style={{
+                            width: `${maxMonthTotal > 0 ? (month.total / maxMonthTotal) * 100 : 0}%`,
+                          }}
+                        />
+                      </div>
+                    )}
+                  </CardHeader>
+
+                  <CardContent className="p-4 pt-2">
+                    {hasEntries ? (
+                      <ul className="space-y-1.5">
+                        {month.entries.map((entry) => (
+                          <li
+                            key={entry.ticker}
+                            className="flex items-center justify-between"
+                          >
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <span
+                                className={cn(
+                                  "shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold leading-none",
+                                  entry.type === "ETF"
+                                    ? "bg-blue-500/15 text-blue-400"
+                                    : "bg-emerald-500/15 text-emerald-400"
+                                )}
+                              >
+                                {entry.type === "ETF" ? "E" : "S"}
+                              </span>
+                              <span className="truncate text-xs text-muted-foreground">
+                                {entry.name}
+                              </span>
+                            </div>
+                            <span className="ml-2 shrink-0 font-mono text-xs font-medium text-foreground">
+                              {formatKRW(entry.amount)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="py-2 text-center text-xs text-muted-foreground/50">
+                        배당 없음
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
     </>
-  );
-}
-
-function ChartTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: Array<{ value: number }>;
-  label?: string;
-}) {
-  if (!active || !payload?.length) return null;
-
-  return (
-    <div className="rounded-lg border border-border bg-card/95 px-3 py-2 shadow-xl backdrop-blur-sm">
-      <p className="mb-1 text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="text-sm font-bold text-foreground">
-        {formatKRW(payload[0].value)}
-      </p>
-    </div>
   );
 }

@@ -23,15 +23,17 @@ import {
   formatExpenseRatio,
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Highlight } from "@/components/ui/highlight";
 
 type SortKey = "price" | "changeRate" | "marketCap" | "volume" | "expenseRatio" | "dividendYield";
 type SortDir = "asc" | "desc";
 
 interface EtfRankingTableProps {
   data: Etf[];
+  searchQuery?: string;
 }
 
-export function EtfRankingTable({ data }: EtfRankingTableProps) {
+export function EtfRankingTable({ data, searchQuery = "" }: EtfRankingTableProps) {
   const router = useRouter();
   const { addItem, hasTicker } = usePortfolio();
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -64,106 +66,193 @@ export function EtfRankingTable({ data }: EtfRankingTableProps) {
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow className="border-border hover:bg-transparent">
-          <TableHead className="w-12 text-muted-foreground">순위</TableHead>
-          <TableHead className="text-muted-foreground">종목명</TableHead>
-          <TableHead className="text-muted-foreground">티커</TableHead>
-          <SortableHead label="현재가" sortKey="price" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
-          <SortableHead label="등락률" sortKey="changeRate" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
-          <SortableHead label="배당률" sortKey="dividendYield" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
-          <SortableHead label="시가총액" sortKey="marketCap" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
-          <SortableHead label="거래량" sortKey="volume" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
-          <SortableHead label="총보수" sortKey="expenseRatio" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
-          <TableHead className="text-muted-foreground">카테고리</TableHead>
-          <TableHead className="w-16 text-center text-muted-foreground">담기</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+    <>
+      {/* Mobile: Card List (< md) */}
+      <div className="space-y-2 md:hidden">
         {sorted.map((etf, index) => {
           const inPortfolio = hasTicker(etf.ticker);
+          const isPositive = etf.changeRate >= 0;
           return (
-            <TableRow
+            <div
               key={etf.ticker}
               onClick={() => router.push(`/etf/${etf.ticker}`)}
-              className="border-border cursor-pointer transition-colors hover:bg-secondary/50"
+              className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 transition-colors active:bg-secondary/50"
             >
-              <TableCell className="font-medium text-muted-foreground">
+              {/* Rank */}
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-muted-foreground">
                 {index + 1}
-              </TableCell>
-              <TableCell className="font-medium text-foreground">
-                {etf.name}
-              </TableCell>
-              <TableCell className="font-mono text-sm text-muted-foreground">
-                {etf.ticker}
-              </TableCell>
-              <TableCell className="text-right font-mono text-foreground">
-                {formatKRW(etf.price)}
-              </TableCell>
-              <TableCell className="text-right">
-                <span
-                  className={`inline-flex items-center gap-1 font-medium ${
-                    etf.changeRate >= 0 ? "text-emerald-400" : "text-red-400"
-                  }`}
+              </span>
+
+              {/* Info */}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    <Highlight text={etf.name} query={searchQuery} />
+                  </p>
+                  {etf.dividendYield > 0 && (
+                    <span className="shrink-0 text-[10px] font-medium text-amber-400">
+                      {etf.dividendYield.toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+                <div className="mt-0.5 flex items-center gap-2">
+                  <span className="font-mono text-xs text-muted-foreground">
+                    <Highlight text={etf.ticker} query={searchQuery} />
+                  </span>
+                  <Badge variant="secondary" className="text-[10px] font-normal px-1.5 py-0">
+                    {etf.category}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Price + Change */}
+              <div className="shrink-0 text-right">
+                <p className="font-mono text-sm font-medium text-foreground">
+                  {formatKRW(etf.price)}
+                </p>
+                <p
+                  className={cn(
+                    "flex items-center justify-end gap-0.5 text-xs font-medium",
+                    isPositive ? "text-emerald-400" : "text-red-400"
+                  )}
                 >
-                  {etf.changeRate >= 0 ? (
-                    <ArrowUpRight className="h-4 w-4" />
+                  {isPositive ? (
+                    <ArrowUpRight className="h-3 w-3" />
                   ) : (
-                    <ArrowDownRight className="h-4 w-4" />
+                    <ArrowDownRight className="h-3 w-3" />
                   )}
                   {formatChangeRate(etf.changeRate)}
-                </span>
-              </TableCell>
-              <TableCell className="text-right">
-                {etf.dividendYield > 0 ? (
-                  <span className="font-mono text-sm text-amber-400">
-                    {etf.dividendYield.toFixed(2)}%
-                  </span>
-                ) : (
-                  <span className="text-xs text-muted-foreground">-</span>
+                </p>
+              </div>
+
+              {/* Add button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-7 w-7 shrink-0",
+                  inPortfolio ? "text-primary" : "text-muted-foreground"
                 )}
-              </TableCell>
-              <TableCell className="text-right text-muted-foreground">
-                {formatMarketCap(etf.marketCap)}
-              </TableCell>
-              <TableCell className="text-right text-muted-foreground">
-                {formatVolume(etf.volume)}
-              </TableCell>
-              <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                {formatExpenseRatio(etf.expenseRatio)}
-              </TableCell>
-              <TableCell>
-                <Badge variant="secondary" className="text-xs font-normal">
-                  {etf.category}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-center">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={
-                    inPortfolio
-                      ? "h-7 w-7 text-primary"
-                      : "h-7 w-7 text-muted-foreground hover:text-primary"
-                  }
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!inPortfolio) addItem(etf.ticker);
-                  }}
-                >
-                  {inPortfolio ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
-                  )}
-                </Button>
-              </TableCell>
-            </TableRow>
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!inPortfolio) addItem(etf.ticker);
+                }}
+              >
+                {inPortfolio ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           );
         })}
-      </TableBody>
-    </Table>
+      </div>
+
+      {/* Desktop: Table (>= md) */}
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-border hover:bg-transparent">
+              <TableHead className="w-12 text-muted-foreground">순위</TableHead>
+              <TableHead className="text-muted-foreground">종목명</TableHead>
+              <TableHead className="text-muted-foreground">티커</TableHead>
+              <SortableHead label="현재가" sortKey="price" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
+              <SortableHead label="등락률" sortKey="changeRate" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
+              <SortableHead label="배당률" sortKey="dividendYield" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
+              <SortableHead label="시가총액" sortKey="marketCap" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
+              <SortableHead label="거래량" sortKey="volume" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
+              <SortableHead label="총보수" sortKey="expenseRatio" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right" />
+              <TableHead className="text-muted-foreground">카테고리</TableHead>
+              <TableHead className="w-16 text-center text-muted-foreground">담기</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sorted.map((etf, index) => {
+              const inPortfolio = hasTicker(etf.ticker);
+              return (
+                <TableRow
+                  key={etf.ticker}
+                  onClick={() => router.push(`/etf/${etf.ticker}`)}
+                  className="border-border cursor-pointer transition-colors hover:bg-secondary/50"
+                >
+                  <TableCell className="font-medium text-muted-foreground">
+                    {index + 1}
+                  </TableCell>
+                  <TableCell className="font-medium text-foreground">
+                    <Highlight text={etf.name} query={searchQuery} />
+                  </TableCell>
+                  <TableCell className="font-mono text-sm text-muted-foreground">
+                    <Highlight text={etf.ticker} query={searchQuery} />
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-foreground">
+                    {formatKRW(etf.price)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span
+                      className={`inline-flex items-center gap-1 font-medium ${
+                        etf.changeRate >= 0 ? "text-emerald-400" : "text-red-400"
+                      }`}
+                    >
+                      {etf.changeRate >= 0 ? (
+                        <ArrowUpRight className="h-4 w-4" />
+                      ) : (
+                        <ArrowDownRight className="h-4 w-4" />
+                      )}
+                      {formatChangeRate(etf.changeRate)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {etf.dividendYield > 0 ? (
+                      <span className="font-mono text-sm text-amber-400">
+                        {etf.dividendYield.toFixed(2)}%
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {formatMarketCap(etf.marketCap)}
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {formatVolume(etf.volume)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                    {formatExpenseRatio(etf.expenseRatio)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      {etf.category}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={
+                        inPortfolio
+                          ? "h-7 w-7 text-primary"
+                          : "h-7 w-7 text-muted-foreground hover:text-primary"
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!inPortfolio) addItem(etf.ticker);
+                      }}
+                    >
+                      {inPortfolio ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <Plus className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }
 

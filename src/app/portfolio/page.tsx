@@ -118,7 +118,7 @@ export default function PortfolioPage() {
                 <>
                   {/* Donut Chart */}
                   <div className="mx-auto h-[220px] w-full max-w-[280px] sm:h-[260px] sm:max-w-[320px]">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <PieChart>
                         <Pie
                           data={items

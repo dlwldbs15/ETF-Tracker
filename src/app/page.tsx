@@ -51,55 +51,65 @@ export default function Home() {
         </div>
 
         {/* ETF Ranking Table */}
-        <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-base font-semibold text-foreground">
-              ETF 수익률 순위
-            </h2>
+        <div className="rounded-lg border border-border bg-card">
+          {/* Sticky: 검색 + 필터 */}
+          <div className="sticky top-0 z-10 rounded-t-lg border-b border-border bg-card p-4 sm:p-5">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-base font-semibold text-foreground">
+                ETF 수익률 순위
+              </h2>
 
-            {/* Search Input */}
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="티커 또는 종목명 검색..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              />
+              {/* Search Input */}
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="티커 또는 종목명 검색..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
             </div>
+
+            {/* Filters */}
+            <div className="mb-3 flex flex-col gap-2.5">
+              <div className="-mx-4 flex items-center gap-2.5 overflow-x-auto px-4 sm:-mx-0 sm:px-0">
+                <span className="w-10 shrink-0 text-[11px] font-medium text-muted-foreground">운용사</span>
+                <FilterChips
+                  options={providers}
+                  selected={selectedProvider}
+                  onSelect={setSelectedProvider}
+                />
+              </div>
+              <div className="-mx-4 flex items-center gap-2.5 overflow-x-auto px-4 sm:-mx-0 sm:px-0">
+                <span className="w-10 shrink-0 text-[11px] font-medium text-muted-foreground">배당</span>
+                <FilterChips
+                  options={dividendCycles}
+                  selected={selectedDividend}
+                  onSelect={setSelectedDividend}
+                  variant="outline"
+                />
+              </div>
+            </div>
+
+            {/* Result Count */}
+            <p className="text-xs text-muted-foreground">
+              총 {filteredEtfs.length}개 종목
+            </p>
           </div>
 
-          {/* Filters */}
-          <div className="mb-4 flex flex-col gap-2.5">
-            <div className="-mx-4 flex items-center gap-2.5 overflow-x-auto px-4 sm:-mx-0 sm:px-0">
-              <span className="w-10 shrink-0 text-[11px] font-medium text-muted-foreground">운용사</span>
-              <FilterChips
-                options={providers}
-                selected={selectedProvider}
-                onSelect={setSelectedProvider}
-              />
+          {/* Table / Card list */}
+          <div className="p-4 pt-0 sm:p-5 sm:pt-0">
+            {/* Desktop: horizontal scroll for wide table */}
+            <div className="hidden md:block -mx-4 overflow-x-auto sm:-mx-5">
+              <div className="min-w-[850px] px-4 sm:px-5 pt-3">
+                <EtfRankingTable data={filteredEtfs} searchQuery={searchQuery} />
+              </div>
             </div>
-            <div className="-mx-4 flex items-center gap-2.5 overflow-x-auto px-4 sm:-mx-0 sm:px-0">
-              <span className="w-10 shrink-0 text-[11px] font-medium text-muted-foreground">배당</span>
-              <FilterChips
-                options={dividendCycles}
-                selected={selectedDividend}
-                onSelect={setSelectedDividend}
-                variant="outline"
-              />
-            </div>
-          </div>
-
-          {/* Result Count */}
-          <p className="mb-3 text-xs text-muted-foreground">
-            총 {filteredEtfs.length}개 종목
-          </p>
-
-          {/* Table with horizontal scroll on mobile */}
-          <div className="-mx-4 overflow-x-auto sm:-mx-5">
-            <div className="min-w-[850px] px-4 sm:px-5">
-              <EtfRankingTable data={filteredEtfs} />
+            {/* Mobile: card list, no horizontal scroll */}
+            <div className="pt-3 md:hidden">
+              <EtfRankingTable data={filteredEtfs} searchQuery={searchQuery} />
             </div>
           </div>
         </div>

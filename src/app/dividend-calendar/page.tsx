@@ -5,9 +5,10 @@ import { CalendarDays, Coins, TrendingUp, Sparkles } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { useShell } from "@/components/layout/shell";
 import { usePortfolio } from "@/context/portfolio-context";
-import { mockAssets } from "@/lib/mock-data";
+import { useAssetMap } from "@/lib/queries/use-asset-lookup";
 import { formatKRW } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import type { Asset } from "@/types/asset";
 import {
   Card,
   CardHeader,
@@ -51,6 +52,7 @@ interface MonthData {
 export default function DividendCalendarPage() {
   const { openSidebar } = useShell();
   const { items } = usePortfolio();
+  const { assetMap } = useAssetMap();
 
   const currentMonth = new Date().getMonth();
 
@@ -58,13 +60,13 @@ export default function DividendCalendarPage() {
   const portfolioAssets = useMemo(() => {
     return items
       .map((item) => {
-        const asset = mockAssets.find((a) => a.ticker === item.ticker);
+        const asset = assetMap.get(item.ticker);
         if (!asset || asset.dividendYield === 0) return null;
         if (asset.type === "ETF" && asset.dividendCycle === "미지급") return null;
         return { ...asset, quantity: item.quantity };
       })
-      .filter(Boolean) as (typeof mockAssets[number] & { quantity: number })[];
-  }, [items]);
+      .filter(Boolean) as (Asset & { quantity: number })[];
+  }, [items, assetMap]);
 
   // 월별 배당 데이터
   const monthlyGrid: MonthData[] = useMemo(() => {

@@ -8,7 +8,7 @@ import {
   useMemo,
 } from "react";
 import { PortfolioItem } from "@/types/etf";
-import { mockAssets, generatePriceHistory } from "@/lib/mock-data";
+import { useAssetMap } from "@/lib/queries/use-asset-lookup";
 
 interface PortfolioContextValue {
   items: PortfolioItem[];
@@ -35,6 +35,7 @@ export function usePortfolio() {
 
 export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<PortfolioItem[]>([]);
+  const { assetMap } = useAssetMap();
 
   const addItem = useCallback((ticker: string) => {
     setItems((prev) => {
@@ -62,12 +63,12 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const amountMap = useMemo(() => {
     const map = new Map<string, number>();
     for (const item of items) {
-      const asset = mockAssets.find((a) => a.ticker === item.ticker);
+      const asset = assetMap.get(item.ticker);
       if (!asset) continue;
       map.set(item.ticker, asset.currentPrice * item.quantity);
     }
     return map;
-  }, [items]);
+  }, [items, assetMap]);
 
   const totalAmount = useMemo(
     () => Array.from(amountMap.values()).reduce((sum, v) => sum + v, 0),
@@ -100,24 +101,18 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       const amount = amountMap.get(item.ticker) ?? 0;
       if (amount <= 0) continue;
 
-      const asset = mockAssets.find((a) => a.ticker === item.ticker);
+      const asset = assetMap.get(item.ticker);
       if (!asset) continue;
 
-      const history = generatePriceHistory(item.ticker);
-      if (history.length < 2) continue;
-
       const pct = amount / totalAmount;
-      const lastPrice = history[history.length - 1].price;
-      const weekAgoPrice = history[Math.max(history.length - 7, 0)].price;
-      const firstPrice = history[0].price;
-
-      rate1w += ((lastPrice - weekAgoPrice) / weekAgoPrice) * 100 * pct;
-      rate1m += ((lastPrice - firstPrice) / firstPrice) * 100 * pct;
+      // changeRate를 기반으로 근사 계산 (1주 = changeRate, 1개월 ≈ changeRate * 4)
+      rate1w += asset.changeRate * pct;
+      rate1m += asset.changeRate * 4 * pct;
       weightedExpense += (asset.type === "ETF" ? asset.expenseRatio : 0) * pct;
     }
 
     return { rate1w, rate1m, weightedExpense };
-  }, [items, amountMap, totalAmount]);
+  }, [items, amountMap, totalAmount, assetMap]);
 
   const value = useMemo(
     () => ({

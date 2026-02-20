@@ -37,7 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { PriceLineChart } from "@/components/chart/price-line-chart";
 import { useShell } from "@/components/layout/shell";
 import { usePortfolio } from "@/context/portfolio-context";
-import { getAssetDetail, generatePriceHistory, getHoldings } from "@/lib/mock-data";
+import { useAssetDetail, usePriceHistory, useHoldings } from "@/lib/queries/use-asset-detail";
 import type { EtfAssetDetail, StockAssetDetail } from "@/types/asset";
 import type { Holding } from "@/types/etf";
 import {
@@ -54,7 +54,17 @@ export default function EtfDetailPage() {
   const router = useRouter();
   const { openSidebar } = useShell();
 
-  const etf = getAssetDetail(params.ticker);
+  const { data: etf, isLoading: isDetailLoading } = useAssetDetail(params.ticker);
+  const { data: priceHistory = [] } = usePriceHistory(params.ticker);
+  const { data: holdings = [] } = useHoldings(params.ticker);
+
+  if (isDetailLoading) {
+    return (
+      <div className="flex h-[80vh] items-center justify-center">
+        <p className="text-sm text-muted-foreground">로딩 중...</p>
+      </div>
+    );
+  }
 
   if (!etf) {
     return (
@@ -70,8 +80,6 @@ export default function EtfDetailPage() {
     );
   }
 
-  const priceHistory = generatePriceHistory(etf.ticker);
-  const holdings = getHoldings(etf.ticker);
   const isPositive = etf.changeRate >= 0;
 
   return (

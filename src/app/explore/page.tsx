@@ -19,7 +19,9 @@ import { Button } from "@/components/ui/button";
 import { Header } from "@/components/layout/header";
 import { useShell } from "@/components/layout/shell";
 import { usePortfolio } from "@/context/portfolio-context";
-import { mockEtfs, mockAssets, getHoldings } from "@/lib/mock-data";
+import { useAssets, useEtfs } from "@/lib/queries/use-assets";
+import { useAssetMap } from "@/lib/queries/use-asset-lookup";
+import { getHoldings } from "@/lib/mock-data";
 import {
   formatKRW,
   formatChangeRate,
@@ -106,6 +108,10 @@ const DEFAULT_MIN_AUM = 0;
 export default function ExplorePage() {
   const { openSidebar } = useShell();
   const { addItem, items } = usePortfolio();
+  const { data: allAssets = [] } = useAssets("ALL");
+  const { data: etfAssets = [] } = useEtfs();
+  const { data: stockAssets = [] } = useAssets("STOCK");
+  const { assetMap } = useAssetMap();
   const [assetTab, setAssetTab] = useState<AssetTab>("ALL");
   const [activeTheme, setActiveTheme] = useState("all");
 
@@ -153,9 +159,9 @@ export default function ExplorePage() {
   const filteredAssets = useMemo(() => {
     // 1. 자산 유형 필터
     let result: Asset[] =
-      assetTab === "ETF" ? mockEtfs
-        : assetTab === "STOCK" ? [...mockAssets.filter((a) => a.type === "STOCK")]
-        : [...mockAssets];
+      assetTab === "ETF" ? [...etfAssets]
+        : assetTab === "STOCK" ? [...stockAssets]
+        : [...allAssets];
 
     // 2. 테마 칩 (ETF 전용) — 주식 탭에서는 무시
     if (isEtfView && activeTheme !== "all") {
@@ -193,12 +199,12 @@ export default function ExplorePage() {
     }
 
     return result;
-  }, [assetTab, isEtfView, activeTheme, searchQuery, maxExpense, minAum, selectedCycles]);
+  }, [assetTab, isEtfView, activeTheme, searchQuery, maxExpense, minAum, selectedCycles, allAssets, etfAssets, stockAssets]);
 
   /* ── 지금 뜨는 종목: 거래량 상위 3개 ──────────────── */
   const trendingAssets = useMemo(
-    () => [...mockAssets].sort((a, b) => b.volume - a.volume).slice(0, 3),
-    []
+    () => [...allAssets].sort((a, b) => b.volume - a.volume).slice(0, 3),
+    [allAssets]
   );
 
   const isInPortfolio = (ticker: string) =>
@@ -683,7 +689,7 @@ export default function ExplorePage() {
           <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
             <div className="flex min-w-0 items-center gap-3">
               {compareTickers.map((ticker) => {
-                const etf = mockAssets.find((e) => e.ticker === ticker);
+                const etf = assetMap.get(ticker);
                 return (
                   <div
                     key={ticker}
@@ -735,6 +741,7 @@ export default function ExplorePage() {
         <CompareModal
           tickerA={compareTickers[0]}
           tickerB={compareTickers[1]}
+          assetMap={assetMap}
           onClose={() => setCompareModalOpen(false)}
         />
       )}
@@ -748,14 +755,16 @@ export default function ExplorePage() {
 function CompareModal({
   tickerA,
   tickerB,
+  assetMap,
   onClose,
 }: {
   tickerA: string;
   tickerB: string;
+  assetMap: Map<string, Asset>;
   onClose: () => void;
 }) {
-  const assetA = mockAssets.find((e) => e.ticker === tickerA);
-  const assetB = mockAssets.find((e) => e.ticker === tickerB);
+  const assetA = assetMap.get(tickerA);
+  const assetB = assetMap.get(tickerB);
   if (!assetA || !assetB) return null;
 
   const bothEtf = assetA.type === "ETF" && assetB.type === "ETF";

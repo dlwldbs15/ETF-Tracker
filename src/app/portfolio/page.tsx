@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Header } from "@/components/layout/header";
 import { useShell } from "@/components/layout/shell";
 import { usePortfolio } from "@/context/portfolio-context";
-import { mockAssets } from "@/lib/mock-data";
+import { useAssetMap } from "@/lib/queries/use-asset-lookup";
 import {
   formatKRW,
   formatChangeRate,
@@ -63,16 +63,17 @@ export default function PortfolioPage() {
   } = usePortfolio();
 
   const [assetFilter, setAssetFilter] = useState<AssetFilter>("ALL");
+  const { assetMap } = useAssetMap();
 
   /* ── 보유 자산 룩업 ─────────────────────────────────── */
   const portfolioAssets = useMemo(() => {
     return items
       .map((item) => {
-        const asset = mockAssets.find((a) => a.ticker === item.ticker);
+        const asset = assetMap.get(item.ticker);
         return asset ? { item, asset } : null;
       })
       .filter(Boolean) as { item: typeof items[number]; asset: Asset }[];
-  }, [items]);
+  }, [items, assetMap]);
 
   /* ── 자산유형별 비중 데이터 (ETF vs 주식 파이) ──────── */
   const typeComposition = useMemo(() => {

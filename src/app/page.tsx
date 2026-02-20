@@ -6,12 +6,14 @@ import { Header } from "@/components/layout/header";
 import { EtfRankingTable } from "@/components/etf-ranking-table";
 import { FilterChips } from "@/components/filter-chips";
 import { useShell } from "@/components/layout/shell";
-import { mockEtfs, issuers } from "@/lib/mock-data";
+import { useEtfs, useIssuers } from "@/lib/queries/use-assets";
 
 const dividendCycles = ["월배당", "분기배당", "연배당"];
 
 export default function Home() {
   const { openSidebar } = useShell();
+  const { data: mockEtfs = [] } = useEtfs();
+  const issuers = useIssuers();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [selectedDividend, setSelectedDividend] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export default function Home() {
 
       return matchesSearch && matchesProvider && matchesDividend;
     });
-  }, [searchQuery, selectedProvider, selectedDividend]);
+  }, [mockEtfs, searchQuery, selectedProvider, selectedDividend]);
 
   return (
     <>

@@ -3,8 +3,22 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── AssetsMaster ────────────────────────────────────────
+// 국내 상장 전 종목 마스터 (공공데이터포털 동기화)
+model AssetsMaster {
+  ticker      String   @id                      // 종목코드 (PK)
+  name        String                            // 종목명
+  marketType  String                            // KOSPI | KOSDAQ | ETF
+  category    String?                           // 업종 / 테마 (선택)
+  lastUpdated DateTime @default(now()) @updatedAt
+
+  @@index([name])
+  @@map("assets_master")
 }
 
 // ─── Category ────────────────────────────────────────────

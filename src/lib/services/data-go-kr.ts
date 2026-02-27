@@ -1,6 +1,10 @@
 /**
  * Naver Finance 실시간 시세 API 클라이언트
  * (공공데이터포털 대신 사용 — ETF + 주식 모두 지원)
+ *
+ * 배당 정보:
+ *   - 주식 → fetchStockDividend() (공공데이터포털 GetStockDividendInfoService)
+ *   - ETF  → naver-scraper.ts scrapeDividendInfo() (Naver 스크래핑)
  */
 
 const POLLING_BASE =
@@ -132,4 +136,98 @@ export async function fetchPriceHistory(
 
 function formatDate(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// ── 주식 배당 정보 (공공데이터포털) ──────────────────────────────────────────
+
+const DIVIDEND_API_BASE =
+  "https://apis.data.go.kr/1160100/service/GetStockDividendInfoService/getStockDividendInfo";
+
+interface DividendApiItem {
+  basDt:           string; // 기준일자 (YYYYMMDD)
+  srtnCd:          string; // 단축코드
+  thstrmDvdnAmt:   string; // 당기 주당배당금 (원)
+  thstrmDvdnYldt:  string; // 당기 배당수익률 (예: "1.82" → 1.82%)
+  dvdnRcd:         string; // 배당기록일
+}
+
+export interface DividendInfo {
+  dividendYield:       number;
+  dividendCycle:       string;
+  lastDividendAmount:  number;
+}
+
+const DEFAULT_DIVIDEND: DividendInfo = {
+  dividendYield: 0,
+  dividendCycle: "미지급",
+  lastDividendAmount: 0,
+};
+
+/**
+ * 공공데이터포털 GetStockDividendInfoService에서 주식 배당 정보를 가져옵니다.
+ * - 최근 2년치 조회 → 최신 레코드 기준 배당수익률·주당배당금 추출
+ * - 연간 레코드 수로 배당 주기(연/분기) 추정
+ * - 실패 시 DEFAULT_DIVIDEND 반환
+ */
+export async function fetchStockDividend(
+  ticker: string
+): Promise<DividendInfo> {
+  const serviceKey = process.env.DATA_GO_KR_API_KEY;
+  if (!serviceKey) return DEFAULT_DIVIDEND;
+
+  const today = new Date();
+  const twoYearsAgo = new Date(today.getFullYear() - 2, 0, 1);
+
+  const params = new URLSearchParams({
+    serviceKey,
+    numOfRows: "10", // 분기배당 기준 2년치 최대 8건
+    pageNo:    "1",
+    resultType: "json",
+    srtnCd:    ticker,
+    beginBasDt: formatDate(twoYearsAgo),
+    endBasDt:   formatDate(today),
+  });
+
+  try {
+    const res = await fetch(`${DIVIDEND_API_BASE}?${params}`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return DEFAULT_DIVIDEND;
+
+    const json = await res.json();
+    const body = json.response?.body;
+    if (!body) return DEFAULT_DIVIDEND;
+
+    const rawItems = body.items === "" ? [] : (body.items?.item ?? []);
+    const items: DividendApiItem[] = Array.isArray(rawItems) ? rawItems : [rawItems];
+    if (items.length === 0) return DEFAULT_DIVIDEND;
+
+    // 최신 기준일 순 정렬
+    items.sort((a, b) => b.basDt.localeCompare(a.basDt));
+    const latest = items[0];
+
+    const rawYield  = parseFloat(latest.thstrmDvdnYldt) || 0;
+    const lastDividendAmount = parseInt(latest.thstrmDvdnAmt, 10) || 0;
+
+    if (rawYield === 0 && lastDividendAmount === 0) return DEFAULT_DIVIDEND;
+
+    // API 값이 소수점 표현(0.0182)이면 100을 곱해 퍼센트로 변환
+    const dividendYield = rawYield < 1 && rawYield > 0 ? rawYield * 100 : rawYield;
+
+    // 배당 주기 — 연간 레코드 수로 추정
+    const thisYear = String(today.getFullYear());
+    const lastYear = String(today.getFullYear() - 1);
+    const maxPerYear = Math.max(
+      items.filter((i) => i.basDt.startsWith(thisYear)).length,
+      items.filter((i) => i.basDt.startsWith(lastYear)).length
+    );
+    const dividendCycle =
+      maxPerYear >= 4 ? "분기배당" :
+      maxPerYear >= 2 ? "반기배당" :
+      "연배당";
+
+    return { dividendYield, dividendCycle, lastDividendAmount };
+  } catch {
+    return DEFAULT_DIVIDEND;
+  }
 }

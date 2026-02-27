@@ -35,15 +35,13 @@ export async function scrapeDividendInfo(
 
     const html = await res.text();
 
-    // 배당수익률 추출: "배당수익률" 텍스트 근처의 숫자
-    const yieldMatch = html.match(
-      /배당수익률\s*<\/th>\s*<td[^>]*>\s*([\d.]+)%/
-    );
+    // 배당수익률: <em id="_dvr">0.88</em>
+    const yieldMatch = html.match(/<em id="_dvr">([\d.]+)<\/em>/);
     const dividendYield = yieldMatch ? parseFloat(yieldMatch[1]) : 0;
 
-    // 주당배당금 추출
+    // 주당배당금: "주당배당금(원)</strong></th>" 다음 <td> 내 텍스트 노드
     const dpsMatch = html.match(
-      /주당배당금\s*<\/th>\s*<td[^>]*>\s*([\d,]+)\s*원/
+      /주당배당금[^<]*<\/strong><\/th>[\s\S]{0,400}?<td[^>]*>\s*\n?\s*([\d,]+)\s*\n/
     );
     const lastDividendAmount = dpsMatch
       ? parseInt(dpsMatch[1].replace(/,/g, ""), 10)

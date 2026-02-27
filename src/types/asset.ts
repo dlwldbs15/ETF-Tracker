@@ -10,6 +10,7 @@ export interface BaseAsset {
   changeRate: number;
   marketCap: number;
   dividendYield: number;
+  dividendCycle: string;
   volume: number;
   category: string;
   type: AssetType;
@@ -21,7 +22,6 @@ export interface EtfAsset extends BaseAsset {
   expenseRatio: number;
   issuer: string;
   nav: number;
-  dividendCycle: string;
   lastDividendAmount: number;
 }
 
@@ -31,6 +31,7 @@ export interface StockAsset extends BaseAsset {
   per: number;
   pbr: number;
   sector: string;
+  lastDividendAmount: number;
 }
 
 /** 통합 자산 (Discriminated Union) */

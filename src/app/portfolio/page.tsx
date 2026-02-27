@@ -98,23 +98,21 @@ export default function PortfolioPage() {
 
     for (const { item, asset } of portfolioAssets) {
       if (item.quantity <= 0 || asset.dividendYield <= 0) continue;
+      if (asset.dividendCycle === "미지급") continue;
       const investedAmount = asset.currentPrice * item.quantity;
       const annualDiv = investedAmount * (asset.dividendYield / 100);
+      const byMonth = asset.type === "ETF" ? etfByMonth : stockByMonth;
 
-      if (asset.type === "ETF") {
-        if (asset.dividendCycle === "월배당") {
-          const monthly = annualDiv / 12;
-          for (let i = 0; i < 12; i++) etfByMonth[i] += monthly;
-        } else if (asset.dividendCycle === "분기배당") {
-          const quarterly = annualDiv / 4;
-          for (const m of [2, 5, 8, 11]) etfByMonth[m] += quarterly;
-        } else if (asset.dividendCycle === "연배당") {
-          etfByMonth[11] += annualDiv;
-        }
-      } else {
-        // 주식: 보통 연 1~4회 → 분기 가정
+      if (asset.dividendCycle === "월배당") {
+        const monthly = annualDiv / 12;
+        for (let i = 0; i < 12; i++) byMonth[i] += monthly;
+      } else if (asset.dividendCycle === "분기배당") {
         const quarterly = annualDiv / 4;
-        for (const m of [2, 5, 8, 11]) stockByMonth[m] += quarterly;
+        for (const m of [2, 5, 8, 11]) byMonth[m] += quarterly;
+      } else if (asset.dividendCycle === "연배당") {
+        // 주식→4월, ETF→12월
+        const payMonth = asset.type === "STOCK" ? 3 : 11;
+        byMonth[payMonth] += annualDiv;
       }
     }
 

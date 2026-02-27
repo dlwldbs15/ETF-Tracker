@@ -59,11 +59,7 @@ export default function EtfDetailPage() {
   const { data: holdings = [] } = useHoldings(params.ticker);
 
   if (isDetailLoading) {
-    return (
-      <div className="flex h-[80vh] items-center justify-center">
-        <p className="text-sm text-muted-foreground">로딩 중...</p>
-      </div>
-    );
+    return <DetailSkeleton />;
   }
 
   if (!etf) {
@@ -221,10 +217,12 @@ export default function EtfDetailPage() {
             </div>
           </div>
 
-          {/* Holdings List */}
-          <div>
-            <HoldingsList holdings={holdings} />
-          </div>
+          {/* Holdings List — ETF 전용 */}
+          {etf.type === "ETF" && holdings.length > 0 && (
+            <div>
+              <HoldingsList holdings={holdings} />
+            </div>
+          )}
         </div>
 
         {/* ETF 전용: 배당 + 분석기 */}
@@ -692,6 +690,68 @@ function AnalyzerTooltip({
 
 const COLLAPSED_COUNT = 5;
 
+// ── 스켈레톤 ─────────────────────────────────────────────────────────────────
+
+function Sk({ className }: { className?: string }) {
+  return (
+    <div className={`animate-pulse rounded bg-secondary ${className ?? ""}`} />
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
+      {/* 헤더 */}
+      <div>
+        <Sk className="mb-4 h-8 w-20" />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Sk className="h-7 w-48" />
+              <Sk className="h-5 w-12" />
+              <Sk className="h-5 w-16" />
+            </div>
+            <Sk className="h-4 w-32" />
+          </div>
+          <div className="space-y-1 sm:text-right">
+            <Sk className="h-9 w-32" />
+            <Sk className="h-5 w-20" />
+          </div>
+        </div>
+      </div>
+
+      {/* 주요 지표 카드 4개 */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="rounded-lg border border-border bg-card p-3 sm:p-4 space-y-2">
+            <Sk className="h-3 w-16" />
+            <Sk className="h-6 w-24" />
+          </div>
+        ))}
+      </div>
+
+      {/* 차트 */}
+      <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
+        <Sk className="mb-4 h-4 w-24" />
+        <Sk className="h-48 w-full" />
+      </div>
+
+      {/* 배당 정보 */}
+      <div className="rounded-lg border border-border bg-card p-4 sm:p-5 space-y-3">
+        <Sk className="h-4 w-20" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="space-y-1">
+              <Sk className="h-3 w-16" />
+              <Sk className="h-5 w-20" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HoldingsList({ holdings }: { holdings: Holding[] }) {
   const [expanded, setExpanded] = useState(false);
   const hasMore = holdings.length > COLLAPSED_COUNT;
@@ -871,6 +931,11 @@ function StockFinancialSection({ stock }: { stock: StockAssetDetail }) {
             <p className="mt-1 text-[11px] text-muted-foreground">
               {stock.dividendYield >= 3 ? "고배당주" : stock.dividendYield >= 1 ? "배당 지급" : "배당 미미"}
             </p>
+            {stock.lastDividendAmount > 0 && (
+              <p className="mt-0.5 text-[11px] font-medium text-amber-400/80">
+                주당 {formatKRW(stock.lastDividendAmount)} · {stock.dividendCycle}
+              </p>
+            )}
           </div>
         </div>
 

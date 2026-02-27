@@ -20,6 +20,8 @@ export async function GET(
   }
 
   try {
+    // 배당 소스: ETF·주식 모두 Naver 스크래핑
+    // (공공데이터포털 배당 API는 API 키 인증 범위 제한으로 미사용)
     const [rawPrice, dividendInfo] = await Promise.all([
       fetchStockPrice(ticker),
       scrapeDividendInfo(ticker),

@@ -343,6 +343,8 @@ export const mockStocks: StockAsset[] = [
     volume: 15_230_000,
     category: "전자/반도체",
     dividendYield: 2.07,
+    dividendCycle: "분기배당",
+    lastDividendAmount: 1444,
     sector: "반도체",
     per: 13.2,
     pbr: 1.15,
@@ -358,6 +360,8 @@ export const mockStocks: StockAsset[] = [
     volume: 4_560_000,
     category: "전자/반도체",
     dividendYield: 0.67,
+    dividendCycle: "연배당",
+    lastDividendAmount: 1200,
     sector: "반도체",
     per: 8.5,
     pbr: 1.82,
@@ -373,6 +377,8 @@ export const mockStocks: StockAsset[] = [
     volume: 1_890_000,
     category: "자동차",
     dividendYield: 3.27,
+    dividendCycle: "분기배당",
+    lastDividendAmount: 8000,
     sector: "자동차",
     per: 5.8,
     pbr: 0.62,
@@ -388,6 +394,8 @@ export const mockStocks: StockAsset[] = [
     volume: 1_230_000,
     category: "IT/플랫폼",
     dividendYield: 0.42,
+    dividendCycle: "연배당",
+    lastDividendAmount: 900,
     sector: "인터넷",
     per: 24.3,
     pbr: 1.45,
@@ -403,6 +411,8 @@ export const mockStocks: StockAsset[] = [
     volume: 2_340_000,
     category: "바이오",
     dividendYield: 0.25,
+    dividendCycle: "연배당",
+    lastDividendAmount: 500,
     sector: "바이오",
     per: 38.7,
     pbr: 3.21,
@@ -599,5 +609,5 @@ const defaultHoldings: Holding[] = [
 ];
 
 export function getHoldings(ticker: string): Holding[] {
-  return holdingsMap[ticker] ?? defaultHoldings;
+  return holdingsMap[ticker] ?? [];
 }

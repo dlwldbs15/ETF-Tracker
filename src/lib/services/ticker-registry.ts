@@ -21,6 +21,7 @@ export interface StockMeta {
   type: "STOCK";
   sector: string;
   category: string;
+  dividendCycle: string;
   per: number;
   pbr: number;
   description: string;
@@ -54,11 +55,11 @@ export const ETF_REGISTRY: Record<string, EtfMeta> = {
 };
 
 export const STOCK_REGISTRY: Record<string, StockMeta> = {
-  "005930": { type: "STOCK", sector: "반도체", category: "전자/반도체", per: 13.2, pbr: 1.15, description: "반도체, 스마트폰, 디스플레이 등을 제조하는 글로벌 전자기업", listingDate: "1975-06-11", employees: 267937, revenue: 258_9400_0000_0000, operatingProfit: 6_5700_0000_0000, netIncome: 15_4800_0000_0000 },
-  "000660": { type: "STOCK", sector: "반도체", category: "전자/반도체", per: 8.5, pbr: 1.82, description: "DRAM, NAND Flash 등 메모리 반도체를 제조하는 기업", listingDate: "1996-12-26", employees: 35000, revenue: 66_1900_0000_0000, operatingProfit: 28_8800_0000_0000, netIncome: 19_5700_0000_0000 },
-  "005380": { type: "STOCK", sector: "자동차", category: "자동차", per: 5.8, pbr: 0.62, description: "승용차, 상용차 및 자동차 부품을 제조·판매하는 자동차 기업", listingDate: "1974-06-28", employees: 75000, revenue: 162_6600_0000_0000, operatingProfit: 14_8700_0000_0000, netIncome: 12_2700_0000_0000 },
-  "035420": { type: "STOCK", sector: "인터넷", category: "IT/플랫폼", per: 24.3, pbr: 1.45, description: "검색, 커머스, 핀테크, 콘텐츠 등 인터넷 플랫폼 기업", listingDate: "2002-10-29", employees: 4500, revenue: 9_6700_0000_0000, operatingProfit: 1_5800_0000_0000, netIncome: 1_0500_0000_0000 },
-  "068270": { type: "STOCK", sector: "바이오", category: "바이오", per: 38.7, pbr: 3.21, description: "바이오시밀러 및 항체 의약품을 개발·생산하는 바이오 기업", listingDate: "2018-11-08", employees: 8500, revenue: 3_5200_0000_0000, operatingProfit: 5800_0000_0000, netIncome: 4200_0000_0000 },
+  "005930": { type: "STOCK", sector: "반도체", category: "전자/반도체", dividendCycle: "분기배당", per: 13.2, pbr: 1.15, description: "반도체, 스마트폰, 디스플레이 등을 제조하는 글로벌 전자기업", listingDate: "1975-06-11", employees: 267937, revenue: 258_9400_0000_0000, operatingProfit: 6_5700_0000_0000, netIncome: 15_4800_0000_0000 },
+  "000660": { type: "STOCK", sector: "반도체", category: "전자/반도체", dividendCycle: "연배당",  per: 8.5, pbr: 1.82, description: "DRAM, NAND Flash 등 메모리 반도체를 제조하는 기업", listingDate: "1996-12-26", employees: 35000, revenue: 66_1900_0000_0000, operatingProfit: 28_8800_0000_0000, netIncome: 19_5700_0000_0000 },
+  "005380": { type: "STOCK", sector: "자동차", category: "자동차", dividendCycle: "분기배당",  per: 5.8, pbr: 0.62, description: "승용차, 상용차 및 자동차 부품을 제조·판매하는 자동차 기업", listingDate: "1974-06-28", employees: 75000, revenue: 162_6600_0000_0000, operatingProfit: 14_8700_0000_0000, netIncome: 12_2700_0000_0000 },
+  "035420": { type: "STOCK", sector: "인터넷", category: "IT/플랫폼", dividendCycle: "연배당",  per: 24.3, pbr: 1.45, description: "검색, 커머스, 핀테크, 콘텐츠 등 인터넷 플랫폼 기업", listingDate: "2002-10-29", employees: 4500, revenue: 9_6700_0000_0000, operatingProfit: 1_5800_0000_0000, netIncome: 1_0500_0000_0000 },
+  "068270": { type: "STOCK", sector: "바이오", category: "바이오", dividendCycle: "연배당",  per: 38.7, pbr: 3.21, description: "바이오시밀러 및 항체 의약품을 개발·생산하는 바이오 기업", listingDate: "2018-11-08", employees: 8500, revenue: 3_5200_0000_0000, operatingProfit: 5800_0000_0000, netIncome: 4200_0000_0000 },
 };
 
 /** 등록된 모든 티커 목록 */

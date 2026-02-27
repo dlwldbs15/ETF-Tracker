@@ -5,8 +5,7 @@
 import type { EtfAsset, StockAsset, Asset, EtfAssetDetail, StockAssetDetail, AssetDetail } from "@/types/asset";
 import type { PricePoint } from "@/types/etf";
 import { ETF_REGISTRY, STOCK_REGISTRY, type EtfMeta, type StockMeta } from "./ticker-registry";
-import type { RawStockPrice } from "./data-go-kr";
-import type { DividendInfo } from "./naver-scraper";
+import type { RawStockPrice, DividendInfo } from "./data-go-kr";
 import { mockAssets } from "@/lib/mock-data";
 
 /** mock-data에서 시가총액 fallback 조회 */
@@ -33,9 +32,12 @@ export function normalizeAsset(
   const name = raw.itmsNm || mockAssets.find((a) => a.ticker === ticker)?.name || ticker;
 
   if (etfMeta) {
-    const dividendYield = dividendOverride?.dividendYield ?? etfMeta.lastDividendAmount > 0
+    // Naver 스크래퍼가 dividendYield를 제공하면 사용, 없으면 레지스트리 기반 추정
+    const scrapedYield = dividendOverride?.dividendYield ?? 0;
+    const estimatedYield = etfMeta.lastDividendAmount > 0
       ? (etfMeta.lastDividendAmount * (etfMeta.dividendCycle === "월배당" ? 12 : etfMeta.dividendCycle === "분기배당" ? 4 : 1)) / currentPrice * 100
       : 0;
+    const dividendYield = scrapedYield > 0 ? scrapedYield : estimatedYield;
 
     const asset: EtfAsset = {
       id: `etf-${ticker}`,
@@ -50,8 +52,9 @@ export function normalizeAsset(
       expenseRatio: etfMeta.expenseRatio,
       issuer: etfMeta.issuer,
       nav: etfMeta.nav,
-      dividendYield: dividendOverride?.dividendYield ?? dividendYield,
-      dividendCycle: dividendOverride?.dividendCycle ?? etfMeta.dividendCycle,
+      dividendYield,
+      // Naver는 월/분기 구분 불가 → 레지스트리 dividendCycle 항상 사용
+      dividendCycle: etfMeta.dividendCycle,
       lastDividendAmount: dividendOverride?.lastDividendAmount ?? etfMeta.lastDividendAmount,
     };
     return asset;
@@ -59,6 +62,8 @@ export function normalizeAsset(
 
   const meta = stockMeta as StockMeta;
   const dividendYield = dividendOverride?.dividendYield ?? 0;
+  // Naver는 주식 배당 주기를 구분하지 못하므로 레지스트리 값 항상 사용
+  const dividendCycle = meta.dividendCycle;
 
   const asset: StockAsset = {
     id: `stock-${ticker}`,
@@ -71,6 +76,8 @@ export function normalizeAsset(
     volume,
     category: meta.category,
     dividendYield,
+    dividendCycle,
+    lastDividendAmount: dividendOverride?.lastDividendAmount ?? 0,
     per: meta.per,
     pbr: meta.pbr,
     sector: meta.sector,

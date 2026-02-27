@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useState,
+  useEffect,
   useCallback,
   useMemo,
 } from "react";
@@ -23,6 +24,11 @@ interface PortfolioContextValue {
   /** 총 투자금액 */
   totalAmount: number;
   estimatedReturn: { rate1w: number; rate1m: number; weightedExpense: number };
+  /** 관심 종목 */
+  watchlist: string[];
+  addToWatchlist: (ticker: string) => void;
+  removeFromWatchlist: (ticker: string) => void;
+  isWatched: (ticker: string) => boolean;
 }
 
 const PortfolioContext = createContext<PortfolioContextValue | null>(null);
@@ -33,9 +39,31 @@ export function usePortfolio() {
   return ctx;
 }
 
+const WATCHLIST_KEY = "investboard:watchlist";
+
 export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<PortfolioItem[]>([]);
+  const [watchlist, setWatchlist] = useState<string[]>([]);
   const { assetMap } = useAssetMap();
+
+  // localStorage 에서 관심 종목 복원
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(WATCHLIST_KEY);
+      if (stored) setWatchlist(JSON.parse(stored) as string[]);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // watchlist 변경 시 localStorage 저장
+  useEffect(() => {
+    try {
+      localStorage.setItem(WATCHLIST_KEY, JSON.stringify(watchlist));
+    } catch {
+      // ignore
+    }
+  }, [watchlist]);
 
   const addItem = useCallback((ticker: string) => {
     setItems((prev) => {
@@ -57,6 +85,21 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const hasTicker = useCallback(
     (ticker: string) => items.some((i) => i.ticker === ticker),
     [items]
+  );
+
+  const addToWatchlist = useCallback((ticker: string) => {
+    setWatchlist((prev) =>
+      prev.includes(ticker) ? prev.filter((t) => t !== ticker) : [...prev, ticker]
+    );
+  }, []);
+
+  const removeFromWatchlist = useCallback((ticker: string) => {
+    setWatchlist((prev) => prev.filter((t) => t !== ticker));
+  }, []);
+
+  const isWatched = useCallback(
+    (ticker: string) => watchlist.includes(ticker),
+    [watchlist]
   );
 
   // 종목별 평가금액 맵
@@ -125,8 +168,12 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       getWeight,
       totalAmount,
       estimatedReturn,
+      watchlist,
+      addToWatchlist,
+      removeFromWatchlist,
+      isWatched,
     }),
-    [items, addItem, removeItem, updateQuantity, hasTicker, getAmount, getWeight, totalAmount, estimatedReturn]
+    [items, addItem, removeItem, updateQuantity, hasTicker, getAmount, getWeight, totalAmount, estimatedReturn, watchlist, addToWatchlist, removeFromWatchlist, isWatched]
   );
 
   return (

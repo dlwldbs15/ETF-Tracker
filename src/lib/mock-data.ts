@@ -595,18 +595,6 @@ const holdingsMap: Record<string, Holding[]> = {
   ],
 };
 
-const defaultHoldings: Holding[] = [
-  { name: "삼성전자", ticker: "005930", weight: 15.2 },
-  { name: "SK하이닉스", ticker: "000660", weight: 8.7 },
-  { name: "LG에너지솔루션", ticker: "373220", weight: 5.3 },
-  { name: "현대차", ticker: "005380", weight: 4.1 },
-  { name: "셀트리온", ticker: "068270", weight: 3.5 },
-  { name: "기아", ticker: "000270", weight: 2.9 },
-  { name: "KB금융", ticker: "105560", weight: 2.6 },
-  { name: "신한지주", ticker: "055550", weight: 2.3 },
-  { name: "NAVER", ticker: "035420", weight: 2.0 },
-  { name: "POSCO홀딩스", ticker: "005490", weight: 1.8 },
-];
 
 export function getHoldings(ticker: string): Holding[] {
   return holdingsMap[ticker] ?? [];

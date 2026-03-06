@@ -7,9 +7,9 @@ import { getAssetDetail } from "@/lib/mock-data";
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { ticker: string } }
+  { params }: { params: Promise<{ ticker: string }> }
 ) {
-  const { ticker } = params;
+  const { ticker } = await params;
   const meta = getTickerMeta(ticker);
 
   if (!meta) {
